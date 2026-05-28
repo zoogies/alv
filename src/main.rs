@@ -1,7 +1,11 @@
 mod lexer;
+mod log;
 
 use std::env;
 use std::process::ExitCode;
+
+use crate::log::alv_error;
+use crate::log::alv_log;
 
 // use lexer::Lexer;
 
@@ -24,12 +28,16 @@ fn main() -> ExitCode {
     let program = match std::fs::read_to_string(input_path) {
         Ok(program) => program,
         Err(error) => {
-            eprintln!("failed to read '{}': {}", input_path, error);
+            alv_error!("failed to read '{}': {}", input_path, error);
             return ExitCode::FAILURE;
         }
     };
 
-    println!("input program:\n{}", program);
+    alv_log!("input program:\n{}", program);
+
+    let mut l = lexer::Lexer::new(&program);
+    
+    l.scan_tokens();
 
     return ExitCode::SUCCESS
 }
