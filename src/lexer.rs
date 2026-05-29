@@ -47,7 +47,7 @@ impl TokenType {
 }
 
 #[derive(Debug)]
-enum Literal<'p> {
+pub enum Literal<'p> {
     String(&'p str),
     Number(f64)
 }

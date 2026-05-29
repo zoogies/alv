@@ -1,5 +1,6 @@
 mod lexer;
 mod log;
+mod parser;
 
 use std::env;
 use std::process::ExitCode;
