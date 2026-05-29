@@ -37,7 +37,12 @@ fn main() -> ExitCode {
 
     let mut l = lexer::Lexer::new(&program);
     
-    l.scan_tokens();
+    let tokens = l.scan_tokens();
+
+    alv_log!("tokens length: {}", tokens.len());
+    for tok in tokens {
+        alv_log!("tok {:?}",tok);
+    }
 
     return ExitCode::SUCCESS
 }

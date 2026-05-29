@@ -1,6 +1,7 @@
 use crate::log::alv_error;
 use crate::log::alv_log;
 
+#[derive(Debug)]
 enum TokenType {
     LeftBrace, RightBrace,
     LeftParen, RightParen,
@@ -45,12 +46,14 @@ impl TokenType {
     }
 }
 
+#[derive(Debug)]
 enum Literal<'p> {
     String(&'p str),
     Number(f64)
 }
 
-struct Token<'p> {
+#[derive(Debug)]
+pub struct Token<'p> {
     token_type: TokenType,
     lexeme: &'p str,
     line: usize,
@@ -165,16 +168,16 @@ impl<'p> Lexer<'p> {
     }
 
     fn string(&mut self) {
-        while(self.peek() != '"' && !self.is_at_end()) {
+        while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {self.line+=1; self.advance(); }
 
             if self.is_at_end() {alv_error!("Unterminated string.\n"); return;}
         
             // closing "
             self.advance();
-
-            self.add_token_literal(TokenType::Str, Literal::String(&self.input[self.start+1..self.current-1]));
         }
+
+        self.add_token_literal(TokenType::Str, Literal::String(&self.input[self.start+1..self.current-1]));
     }
 
     fn is_digit(&self, c: char) -> bool {
@@ -190,13 +193,13 @@ impl<'p> Lexer<'p> {
     }
 
     fn number(&mut self) {
-        while(self.is_digit(self.peek())) { self.advance(); }
+        while self.is_digit(self.peek()) { self.advance(); }
 
         // look for fractional component
-        if(self.peek() == '.' && self.is_digit(self.peek_next())) {
+        if self.peek() == '.' && self.is_digit(self.peek_next()) {
             self.advance();
 
-            while(self.is_digit(self.peek())) {self.advance();}
+            while self.is_digit(self.peek()) {self.advance();}
         }
 
         self.add_token_literal(TokenType::Num, Literal::Number(
@@ -205,7 +208,7 @@ impl<'p> Lexer<'p> {
     }
 
     fn identifier(&mut self) {
-        while(self.is_alphanumeric(self.peek())) {self.advance();}
+        while self.is_alphanumeric(self.peek()) {self.advance();}
 
         self.add_token(TokenType::from_ident(&self.input[self.start..self.current]));
     }
@@ -264,8 +267,8 @@ impl<'p> Lexer<'p> {
         }
     }
 
-    pub fn scan_tokens(&mut self) {
-        while(!self.is_at_end()) {
+    pub fn scan_tokens(mut self) -> Vec<Token<'p>> {
+        while !self.is_at_end() {
             alv_log!("self.current: {} self.input[self.current]: {:?}\n",self.current,self.input.chars().nth(self.current));
 
             self.start = self.current;
@@ -273,6 +276,8 @@ impl<'p> Lexer<'p> {
         }
 
         self.tokens.push(Token { token_type: TokenType::EndFile, lexeme: "", line: self.line, literal: None });
+        
+        self.tokens
     }
 
 }
