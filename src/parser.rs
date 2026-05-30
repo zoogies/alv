@@ -24,6 +24,12 @@ pub struct Parser<'p> {
     current: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct ParseError<'p> {
+    pub token: &'p Token<'p>,
+    pub message: &'static str,
+}
+
 impl<'p> Parser<'p> {
     pub fn new(tokens: &'p Vec<Token<'p>>) -> Self {
         Self {
@@ -128,7 +134,7 @@ impl<'p> Parser<'p> {
         if self.match_token(&[TokenType::Nil]) { return Expr::Literal { value: Literal::Nil }; }
 
         if self.match_token(&[TokenType::Num, TokenType::Str]) {
-            return Expr::Literal { value: self.previous().literal.expect("Missing literal in parser.rs::primary()") };
+            return Expr::Literal { value: self.previous().literal.clone().expect("Missing literal in parser.rs::primary()") };
         }
 
         if self.match_token(&[TokenType::LeftParen]) {
@@ -142,10 +148,19 @@ impl<'p> Parser<'p> {
 
     // ------------ error recovery ------------
 
-    fn consume(&mut self, ty: TokenType, msg: &str) -> &Token { // TODO: is ref to token?
-        if self.check(ty) { return self.advance(); }
-
+    fn error(&self, token: &'p Token<'p>, msg: &'static str) -> ParseError<'p> {
+        alv_error!("{:?}, {}", token, msg); // TODO: token doesnt impl display?
         
+        ParseError { 
+            token: token, 
+            message: msg, 
+        }
+    }
+
+    fn consume(&mut self, ty: TokenType, msg: &'static str) -> Result<&'p Token<'p>, ParseError<'p>> {
+        if self.check(ty) { return Ok(self.advance()); }
+
+        Err(self.error(self.peek(), msg))
     }
 
     // ------------ token ops ------------
@@ -160,21 +175,21 @@ impl<'p> Parser<'p> {
         false
     }
 
-    fn check(&self, t: TokenType) -> bool {
+    fn check(&mut self, t: TokenType) -> bool {
         if self.is_at_end() { return false; }
         self.peek().token_type == t // TODO check literal "type" not classified
     }
     
-    fn advance(&mut self) -> &Token<'p> {
+    fn advance(&mut self) -> &'p Token<'p> {
         if !self.is_at_end() { self.current += 1 }
         self.previous()
     }
 
-    fn is_at_end(&self) -> bool {
+    fn is_at_end(&mut self) -> bool {
         self.peek().token_type == TokenType::EndFile
     }
 
-    fn _idx(&self, delta: isize) -> &Token<'p> {
+    fn _idx(&self, delta: isize) -> &'p Token<'p> {
         let idx = self.current.checked_add_signed(delta).unwrap_or_else(|| {
             panic!("under/overflow in parser.rs::_idx: current={} delta={}", self.current, delta)
         });
@@ -184,11 +199,11 @@ impl<'p> Parser<'p> {
         })
     }
 
-    fn peek(&self) -> &Token<'p> {
+    fn peek(&self) -> &'p Token<'p> {
         self._idx(0)
     }
 
-    fn previous(&self) -> &Token<'p> {
+    fn previous(&self) -> &'p Token<'p> {
         self._idx(-1)
     }
 
