@@ -8,7 +8,12 @@ use std::process::ExitCode;
 use crate::log::alv_error;
 use crate::log::alv_log;
 
-// use lexer::Lexer;
+use lexer::Literal;
+use lexer::Token;
+use lexer::TokenType;
+
+use parser::AstPrinter;
+use parser::Expr;
 
 fn print_usage() {
     println!("usage: alv <input file>.alv");
@@ -36,7 +41,7 @@ fn main() -> ExitCode {
 
     alv_log!("input program:\n{}", program);
 
-    let mut l = lexer::Lexer::new(&program);
+    let l = lexer::Lexer::new(&program);
     
     let tokens = l.scan_tokens();
 
@@ -44,6 +49,35 @@ fn main() -> ExitCode {
     for tok in tokens {
         alv_log!("tok {:?}",tok);
     }
+
+    let expression = Expr::Binary {
+        left: Box::new(Expr::Unary {
+            operator: Token {
+                token_type: TokenType::Minus,
+                lexeme: "-",
+                literal: None,
+                line: 1,
+            },
+            right: Box::new(Expr::Literal {
+                value: Literal::Number(123.0),
+            }),
+        }),
+
+        operator: Token {
+            token_type: TokenType::Star,
+            lexeme: "*",
+            literal: None,
+            line: 1,
+        },
+
+        right: Box::new(Expr::Grouping {
+            expression: Box::new(Expr::Literal {
+                value: Literal::Number(45.67),
+            }),
+        }),
+    };
+
+    println!("{}", AstPrinter.print(&expression));
 
     return ExitCode::SUCCESS
 }

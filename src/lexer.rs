@@ -2,7 +2,7 @@ use crate::log::alv_error;
 use crate::log::alv_log;
 
 #[derive(Debug)]
-enum TokenType {
+pub enum TokenType {
     LeftBrace, RightBrace,
     LeftParen, RightParen,
     Plus, Minus, Star, Slash,
@@ -49,15 +49,17 @@ impl TokenType {
 #[derive(Debug)]
 pub enum Literal<'p> {
     String(&'p str),
-    Number(f64)
+    Number(f64),
+    Bool(bool),
+    Nil,
 }
 
 #[derive(Debug)]
 pub struct Token<'p> {
-    token_type: TokenType,
-    lexeme: &'p str,
-    line: usize,
-    literal: Option<Literal<'p>>,
+    pub token_type: TokenType,
+    pub lexeme: &'p str,
+    pub line: usize,
+    pub literal: Option<Literal<'p>>,
 }
 
 impl<'p> Token<'p> {
