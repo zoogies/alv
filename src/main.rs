@@ -12,6 +12,7 @@ use lexer::Literal;
 use lexer::Token;
 use lexer::TokenType;
 
+use parser::Parser;
 use parser::AstPrinter;
 use parser::Expr;
 
@@ -46,38 +47,40 @@ fn main() -> ExitCode {
     let tokens = l.scan_tokens();
 
     alv_log!("tokens length: {}", tokens.len());
-    for tok in tokens {
+    for tok in &tokens {
         alv_log!("tok {:?}",tok);
     }
 
-    let expression = Expr::Binary {
-        left: Box::new(Expr::Unary {
-            operator: Token {
-                token_type: TokenType::Minus,
-                lexeme: "-",
-                literal: None,
-                line: 1,
-            },
-            right: Box::new(Expr::Literal {
-                value: Literal::Number(123.0),
-            }),
-        }),
+    // let expression = Expr::Binary {
+    //     left: Box::new(Expr::Unary {
+    //         operator: Token {
+    //             token_type: TokenType::Minus,
+    //             lexeme: "-",
+    //             literal: None,
+    //             line: 1,
+    //         },
+    //         right: Box::new(Expr::Literal {
+    //             value: Literal::Number(123.0),
+    //         }),
+    //     }),
 
-        operator: Token {
-            token_type: TokenType::Star,
-            lexeme: "*",
-            literal: None,
-            line: 1,
-        },
+    //     operator: Token {
+    //         token_type: TokenType::Star,
+    //         lexeme: "*",
+    //         literal: None,
+    //         line: 1,
+    //     },
 
-        right: Box::new(Expr::Grouping {
-            expression: Box::new(Expr::Literal {
-                value: Literal::Number(45.67),
-            }),
-        }),
-    };
+    //     right: Box::new(Expr::Grouping {
+    //         expression: Box::new(Expr::Literal {
+    //             value: Literal::Number(45.67),
+    //         }),
+    //     }),
+    // };
 
-    println!("{}", AstPrinter.print(&expression));
+    // println!("{}", AstPrinter.print(&expression));
+
+    let p = Parser::new(&tokens);
 
     return ExitCode::SUCCESS
 }

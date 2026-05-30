@@ -19,9 +19,21 @@ pub enum Expr<'p> {
     },
 }
 
-pub struct Parser {
-
+pub struct Parser<'p> {
+    tokens: &'p Vec<Token<'p>>,
+    current: u32,
 }
+
+impl<'p> Parser<'p> {
+    pub fn new(tokens: &'p Vec<Token<'p>>) -> Self {
+        Self {
+            tokens,
+            current: 0,
+        }
+    }
+}
+
+// --------------------- printer ---------------------
 
 pub struct AstPrinter;
 
