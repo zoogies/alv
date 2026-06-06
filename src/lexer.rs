@@ -172,12 +172,16 @@ impl<'p> Lexer<'p> {
     fn string(&mut self) {
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {self.line+=1; self.advance(); }
-
-            if self.is_at_end() {alv_error!("Unterminated string.\n"); return;}
-        
-            // closing "
             self.advance();
         }
+        
+        if self.is_at_end() {
+            alv_error!("Unterminated string.\n");
+            return;
+        }
+
+        // closing "
+        self.advance();
 
         self.add_token_literal(TokenType::Str, Literal::String(&self.input[self.start+1..self.current-1]));
     }
@@ -205,7 +209,7 @@ impl<'p> Lexer<'p> {
         }
 
         self.add_token_literal(TokenType::Num, Literal::Number(
-            self.input.parse::<f64>().expect("Not a valid number")
+            self.input[self.start..self.current].parse::<f64>().expect("Not a valid number")
         ))
     }
 

@@ -30,6 +30,8 @@ pub struct ParseError<'p> {
     pub message: &'static str,
 }
 
+type ParseResult<'p, T> = Result<T, ParseError<'p>>;
+
 impl<'p> Parser<'p> {
     pub fn new(tokens: &'p Vec<Token<'p>>) -> Self {
         Self {
@@ -40,16 +42,16 @@ impl<'p> Parser<'p> {
 
     // --------------------- operators ---------------------
 
-    fn expression(&mut self) -> Expr<'p> {
+    fn expression(&mut self) -> ParseResult<'p, Expr<'p>> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Expr<'p> {
-        let mut expr: Expr = self.comparison();
+    fn equality(&mut self) -> Result<Expr<'p>, ParseError<'p>> {
+        let mut expr: Expr = self.comparison()?;
     
         while self.match_token(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator: Token = self.previous().clone();
-            let right: Expr = self.comparison();
+            let right: Expr = self.comparison()?;
             
             expr = Expr::Binary {
                 left: Box::new(expr),
@@ -58,11 +60,11 @@ impl<'p> Parser<'p> {
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn comparison(&mut self) -> Expr<'p> {
-        let mut expr = self.term();
+    fn comparison(&mut self) -> ParseResult<'p, Expr<'p>> {
+        let mut expr = self.term()?;
 
         while self.match_token(&[
             TokenType::Greater,
@@ -73,15 +75,15 @@ impl<'p> Parser<'p> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator: self.previous().clone(),
-                right: Box::new(self.term()),
+                right: Box::new(self.term()?),
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn term(&mut self) -> Expr<'p> {
-        let mut expr = self.factor();
+    fn term(&mut self) -> ParseResult<'p, Expr<'p>> {
+        let mut expr = self.factor()?;
 
         while self.match_token(&[
             TokenType::Minus,
@@ -90,15 +92,15 @@ impl<'p> Parser<'p> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator: self.previous().clone(),
-                right: Box::new(self.factor()),
+                right: Box::new(self.factor()?),
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn factor(&mut self) -> Expr<'p> {
-        let mut expr = self.unary();
+    fn factor(&mut self) -> ParseResult<'p, Expr<'p>> {
+        let mut expr = self.unary()?;
 
         while self.match_token(&[
             TokenType::Slash,
@@ -107,53 +109,57 @@ impl<'p> Parser<'p> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator: self.previous().clone(),
-                right: Box::new(self.unary()),
+                right: Box::new(self.unary()?),
             }
         }
 
-        expr
+        Ok(expr)
     }
 
-    fn unary(&mut self) -> Expr<'p> {
+    fn unary(&mut self) -> ParseResult<'p, Expr<'p>> {
         if self.match_token(&[
             TokenType::Bang,
             TokenType::Minus
         ]) {
-            return Expr::Unary {
+            return Ok(Expr::Unary {
                 operator: self.previous().clone(),
-                right: Box::new(self.unary()),
-            }
+                right: Box::new(self.unary()?),
+            })
         }
 
         self.primary()
     }
 
-    fn primary(&mut self) -> Expr<'p> {
-        if self.match_token(&[TokenType::False]) { return Expr::Literal { value: Literal::Bool(false) }; }
-        if self.match_token(&[TokenType::True]) { return Expr::Literal { value: Literal::Bool(true) }; }
-        if self.match_token(&[TokenType::Nil]) { return Expr::Literal { value: Literal::Nil }; }
+    fn primary(&mut self) -> ParseResult<'p, Expr<'p>> {
+        if self.match_token(&[TokenType::False]) { return Ok(Expr::Literal { value: Literal::Bool(false) }); }
+        if self.match_token(&[TokenType::True])  { return Ok(Expr::Literal { value: Literal::Bool(true)  }); }
+        if self.match_token(&[TokenType::Nil])   { return Ok(Expr::Literal { value: Literal::Nil         }); }
 
         if self.match_token(&[TokenType::Num, TokenType::Str]) {
-            return Expr::Literal { value: self.previous().literal.clone().expect("Missing literal in parser.rs::primary()") };
+            return Ok(Expr::Literal { value: self.previous().literal.clone().expect("Missing literal in parser.rs::primary()") });
         }
 
         if self.match_token(&[TokenType::LeftParen]) {
-            let expr = self.expression();
-            self.consume(TokenType::RightParen, "Expect ')' after expression.");
-            return Expr::Grouping { expression: Box::new(expr) };
+            let expr = self.expression()?;
+            self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
+            return Ok(Expr::Grouping { expression: Box::new(expr) });
         }
 
-        panic!("Bad case in parser.rs::primary(): fell through");
+        Err(self.error(self.peek(), "Expect expression."))
     }
 
     // ------------ error recovery ------------
 
     fn error(&self, token: &'p Token<'p>, msg: &'static str) -> ParseError<'p> {
-        alv_error!("{:?}, {}", token, msg); // TODO: token doesnt impl display?
-        
-        ParseError { 
-            token: token, 
-            message: msg, 
+        if token.token_type == TokenType::EndFile {
+            alv_error!("[line {}] at end: {}", token.line, msg);
+        } else {
+            alv_error!("[line {}] at '{}': {}", token.line, token.lexeme, msg);
+        }
+
+        ParseError {
+            token,
+            message: msg,
         }
     }
 
@@ -205,6 +211,31 @@ impl<'p> Parser<'p> {
 
     fn previous(&self) -> &'p Token<'p> {
         self._idx(-1)
+    }
+
+    // --------------------- actually parse ---------------------
+    pub fn parse(&mut self) -> Option<Expr<'p>> {
+        match self.expression() {
+            Ok(expr) => Some(expr),
+            Err(_) => {
+                self.synchronize();
+                None
+            }
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.advance();
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {return;}
+            match self.peek().token_type {
+                TokenType::Class | TokenType::Fun | TokenType::Var |
+                TokenType::For | TokenType::If | TokenType::While |
+                TokenType::Print | TokenType::Return => return,
+                _ => {}
+            }
+            self.advance();
+        }
     }
 
 }

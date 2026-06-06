@@ -80,7 +80,8 @@ fn main() -> ExitCode {
 
     // println!("{}", AstPrinter.print(&expression));
 
-    let p = Parser::new(&tokens);
+    let mut p = Parser::new(&tokens);
+    AstPrinter.print(&p.parse().expect("bad code!"));
 
     return ExitCode::SUCCESS
 }
