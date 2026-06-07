@@ -1,12 +1,14 @@
 mod lexer;
 mod log;
 mod parser;
+mod treewalk;
 
 use std::env;
 use std::process::ExitCode;
 
 use crate::log::alv_error;
 use crate::log::alv_log;
+use crate::treewalk::TWInterp;
 
 use lexer::Literal;
 use lexer::Token;
@@ -81,7 +83,8 @@ fn main() -> ExitCode {
     // println!("{}", AstPrinter.print(&expression));
 
     let mut p = Parser::new(&tokens);
-    AstPrinter.print(&p.parse().expect("bad code!"));
+    let e: Expr = p.parse().expect("bad code!");
+    AstPrinter.print(&e);
 
-    return ExitCode::SUCCESS
+    return TWInterp.interpret(&e);
 }
