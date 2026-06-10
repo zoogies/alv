@@ -275,7 +275,7 @@ impl<'p> Lexer<'p> {
 
     pub fn scan_tokens(mut self) -> Vec<Token<'p>> {
         while !self.is_at_end() {
-            alv_log!("self.current: {} self.input[self.current]: {:?}\n",self.current,self.input.chars().nth(self.current));
+            // alv_log!("self.current: {} self.input[self.current]: {:?}\n",self.current,self.input.chars().nth(self.current));
 
             self.start = self.current;
             self.scan_token();

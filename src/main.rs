@@ -42,7 +42,9 @@ fn main() -> ExitCode {
         }
     };
 
-    alv_log!("input program:\n{}", program);
+    alv_log!("-------------   Input Program    -------------");
+    println!("{}\n", program);
+    alv_log!("-------------    Lexer Output    -------------");
 
     let l = lexer::Lexer::new(&program);
     
@@ -52,39 +54,23 @@ fn main() -> ExitCode {
     for tok in &tokens {
         alv_log!("tok {:?}",tok);
     }
-
-    // let expression = Expr::Binary {
-    //     left: Box::new(Expr::Unary {
-    //         operator: Token {
-    //             token_type: TokenType::Minus,
-    //             lexeme: "-",
-    //             literal: None,
-    //             line: 1,
-    //         },
-    //         right: Box::new(Expr::Literal {
-    //             value: Literal::Number(123.0),
-    //         }),
-    //     }),
-
-    //     operator: Token {
-    //         token_type: TokenType::Star,
-    //         lexeme: "*",
-    //         literal: None,
-    //         line: 1,
-    //     },
-
-    //     right: Box::new(Expr::Grouping {
-    //         expression: Box::new(Expr::Literal {
-    //             value: Literal::Number(45.67),
-    //         }),
-    //     }),
-    // };
-
-    // println!("{}", AstPrinter.print(&expression));
+    
+    // no output, for now
+    // alv_log!("-------------   Parser Output    -------------");
 
     let mut p = Parser::new(&tokens);
-    let e: Expr = p.parse().expect("bad code!");
-    AstPrinter.print(&e);
-
-    return TWInterp.interpret(&e);
+    let e = p.parse();
+    match e {
+        Ok(e) => {
+            println!("\n");
+            alv_log!("------------- Interpreter Output -------------");
+            
+            // TODO: should exit with code 70 if runtime error occurred
+            TWInterp.interpret(&e)
+        },
+        Err(_e) => {
+            std::process::exit(65);
+        }
+    }
+    // AstPrinter.print(&e);
 }

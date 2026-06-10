@@ -1,4 +1,6 @@
-use crate::{lexer::*, log::alv_error};
+use std::fmt::Error;
+
+use crate::{lexer::*, log::alv_error, parser::Stmt::{ExpressionStmt, PrintStmt}};
 
 // TODO: had to infect this with <'p> because of lexeme string slice reference...
 pub enum Expr<'p> {
@@ -31,6 +33,11 @@ pub struct ParseError<'p> {
 }
 
 type ParseResult<'p, T> = Result<T, ParseError<'p>>;
+
+pub enum Stmt<'p> {
+    ExpressionStmt(Box<Expr<'p>>),
+    PrintStmt(Box<Expr<'p>>),
+}
 
 impl<'p> Parser<'p> {
     pub fn new(tokens: &'p Vec<Token<'p>>) -> Self {
@@ -152,9 +159,9 @@ impl<'p> Parser<'p> {
 
     fn error(&self, token: &'p Token<'p>, msg: &'static str) -> ParseError<'p> {
         if token.token_type == TokenType::EndFile {
-            alv_error!("[line {}] at end: {}", token.line, msg);
+            alv_error!("[line {}] at end: {}", token.line + 1, msg);
         } else {
-            alv_error!("[line {}] at '{}': {}", token.line, token.lexeme, msg);
+            alv_error!("[line {}] at '{}': {}", token.line + 1, token.lexeme, msg);
         }
 
         ParseError {
@@ -214,14 +221,39 @@ impl<'p> Parser<'p> {
     }
 
     // --------------------- actually parse ---------------------
-    pub fn parse(&mut self) -> Option<Expr<'p>> {
-        match self.expression() {
-            Ok(expr) => Some(expr),
-            Err(_) => {
-                self.synchronize();
-                None
+    pub fn parse(&mut self) -> Result<Vec<Stmt<'p>>, ()> {
+        let mut v: Vec<Stmt> = Vec::new();
+        let mut had_error = false;
+        while !self.is_at_end() {
+            match self.statement() {
+                Ok(s) => v.push(s),
+                Err(_e) => { had_error = true; self.synchronize(); },
             }
         }
+
+        if had_error { return Err(()); }
+        
+        Ok(v)
+    }
+
+    fn statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        if self.match_token(&[TokenType::Print]) {
+            return self.print_statement();
+        }
+
+        self.expression_statement()
+    }
+
+    fn print_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(PrintStmt(Box::new(expr)))
+    }
+
+    fn expression_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(ExpressionStmt(Box::new(expr)))
     }
 
     fn synchronize(&mut self) {

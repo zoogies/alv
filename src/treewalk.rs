@@ -123,19 +123,51 @@ impl TWInterp {
         }
     }
 
-    // TODO: bubble out an exit code?
-    pub fn interpret(&self, expr: &Expr) -> ExitCode {
-        let v = self.evaluate(expr);
-        match v {
-            Ok(v) => {
-                alv_log!("Treewalk output: {:?}", v); // TODO: FIX
-                return ExitCode::SUCCESS;
+    fn stringify(&self, value: &Value) -> String {
+        match value {
+            Value::String(s) => {
+                s.clone()
             },
-            Err(error) => {
-                alv_error!("Runtime error on line {}! {}", error.line, error.message);
-                return ExitCode::FAILURE;
+            Value::Boolean(b) => {
+                b.to_string()
+            },
+            Value::Number(n) => {
+                n.to_string()
+            }
+            Value::Nil => {
+                "Nil".to_string()
             }
         }
+    }
+
+    fn execute(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match stmt {
+            Stmt::PrintStmt(pstmt) => {
+                let v: Value = self.evaluate(&*pstmt)?;
+                alv_log!("{}",self.stringify(&v));
+                Ok(())
+            },
+            Stmt::ExpressionStmt(estmt) => {
+                self.evaluate(&*estmt)?;
+                Ok(())
+            }
+        }
+    }
+
+    // TODO: bubble out an exit code?
+    pub fn interpret(&self, stmts: &Vec<Stmt>) -> ExitCode {
+        for stmt in stmts {
+            match self.execute(stmt) {
+                Ok(_v) => {
+                    // alv_log!("Treewalk output: {:?}", v); // TODO: FIX
+                },
+                Err(error) => {
+                    alv_error!("Runtime error on line {}! {}", error.line + 1, error.message);
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
+        ExitCode::SUCCESS
     }
 
 }
