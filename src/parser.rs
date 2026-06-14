@@ -1,9 +1,13 @@
 use std::fmt::Error;
 
-use crate::{lexer::*, log::alv_error, parser::Stmt::{ExpressionStmt, PrintStmt}};
+use crate::{lexer::*, log::alv_error, parser::{Expr::Assign, Stmt::{ExpressionStmt, PrintStmt}}};
 
 // TODO: had to infect this with <'p> because of lexeme string slice reference...
 pub enum Expr<'p> {
+    Assign {
+        name: Token<'p>,
+        value: Box<Expr<'p>>
+    },
     Binary {
         left: Box<Expr<'p>>,
         operator: Token<'p>,
@@ -53,8 +57,30 @@ impl<'p> Parser<'p> {
 
     // --------------------- operators ---------------------
 
+    fn assignment(&mut self) -> ParseResult<'p, Expr<'p>> {
+        let expr = self.equality()?;
+
+        if self.match_token(&[TokenType::Equal]) {
+            let equals = self.previous();
+            let value = self.assignment()?;
+
+            match expr {
+                Expr::Variable { name } => {
+                    return Ok(
+                        Expr::Assign { name, value: Box::new(value) }
+                    );
+                }
+                _ => {
+                    return Err(self.error(equals, "Invalid assignment target."));
+                }
+            }
+        }
+
+        Ok(expr)
+    }
+
     fn expression(&mut self) -> ParseResult<'p, Expr<'p>> {
-        self.equality()
+        self.assignment()
     }
 
     fn equality(&mut self) -> Result<Expr<'p>, ParseError<'p>> {

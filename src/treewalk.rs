@@ -23,13 +23,14 @@ pub struct TWInterp {
 }
 
 impl TWInterp {
-    pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Literal { value } => self.eval_literal(value),
             Expr::Grouping { expression } => self.evaluate(expression),
             Expr::Unary { operator, right } => self.eval_unary(operator, right),
             Expr::Binary { left, operator, right } => self.eval_binary(left, operator, right),
-            Expr::Variable { name } => self.eval_variable(name)
+            Expr::Variable { name } => self.eval_variable(name),
+            Expr::Assign { name, value } => self.eval_assign(name, value),
         }
     }
 
@@ -50,7 +51,7 @@ impl TWInterp {
         }
     }
 
-    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
+    fn eval_unary(&mut self, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
         let right = self.evaluate(right)?;
 
         match operator.token_type {
@@ -83,7 +84,7 @@ impl TWInterp {
         }
     }
 
-    fn eval_binary(&self, left: &Expr, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
+    fn eval_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
 
@@ -132,6 +133,19 @@ impl TWInterp {
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError { message: "Undefined variable.", line: name.line })
         }
+    }
+
+    fn eval_assign(&mut self, name: &Token, value: &Expr) -> Result<Value, RuntimeError> {
+        let value = self.evaluate(value)?;
+        
+        if self.environment.contains_key(name.lexeme) {
+            self.environment.entry(name.lexeme.to_string()).and_modify(|v| *v = value.clone());
+        }
+        else {
+            return Err(RuntimeError {message: "Undefined variable TODO INSERT LEXEME NAME", line: name.line});
+        }
+
+        Ok(value)
     }
 
     fn stringify(&self, value: &Value) -> String {
