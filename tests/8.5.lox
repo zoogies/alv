@@ -1,0 +1,9 @@
+{
+    var a = 69;
+    print a;
+}
+
+{
+    var a = 420;
+    print a;
+}

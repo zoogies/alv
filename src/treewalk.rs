@@ -1,6 +1,6 @@
 use crate::{lexer::*, log::{alv_error, alv_log}, parser::*};
 
-use std::{collections::HashMap, process::ExitCode};
+use std::{cell::RefCell, rc::Rc, collections::HashMap, process::ExitCode};
 
 // currently shadows literal, but with global strings
 #[derive(Debug, Clone)]
@@ -18,8 +18,43 @@ pub struct RuntimeError {
 }
 
 #[derive(Default)]
+pub struct Environment {
+    environment: HashMap<String,Value>,
+    enclosing: Option<Rc<RefCell<Environment>>>
+}
+
+impl Environment {
+    pub fn get(&self, k: &str) -> Option<Value> {
+        match self.environment.get(k) {
+            Some(v) => Some(v.clone()),
+            None => match &self.enclosing {
+                Some(parent) => parent.borrow().get(k),
+                None => None
+            }
+        }
+    }
+
+    pub fn define(&mut self, k: String, v: Value) {
+        self.environment.insert(k, v);
+    }
+
+    pub fn assign(&mut self, k: &str, v: Value) -> bool {
+        if self.environment.contains_key(k) {
+            self.environment.insert(k.to_string(), v);
+            true
+        }
+        else {
+            match &self.enclosing {
+                Some(parent) => parent.borrow_mut().assign(k, v),
+                None => false,
+            }
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct TWInterp {
-    environment: HashMap<String,Value>
+    environment: Environment
 }
 
 impl TWInterp {
@@ -128,9 +163,9 @@ impl TWInterp {
         }
     }
 
-    fn eval_variable(&self, name: &Token) -> Result<Value, RuntimeError> {
+    fn eval_variable(&mut self, name: &Token) -> Result<Value, RuntimeError> {
         match self.environment.get(name.lexeme) {
-            Some(v) => Ok(v.clone()),
+            Some(v) => Ok(v),
             None => Err(RuntimeError { message: "Undefined variable.", line: name.line })
         }
     }
@@ -138,14 +173,12 @@ impl TWInterp {
     fn eval_assign(&mut self, name: &Token, value: &Expr) -> Result<Value, RuntimeError> {
         let value = self.evaluate(value)?;
         
-        if self.environment.contains_key(name.lexeme) {
-            self.environment.entry(name.lexeme.to_string()).and_modify(|v| *v = value.clone());
+        if self.environment.assign(name.lexeme, value.clone()) {
+            Ok(value)
         }
         else {
-            return Err(RuntimeError {message: "Undefined variable TODO INSERT LEXEME NAME", line: name.line});
+            Err(RuntimeError {message: "Undefined variable TODO INSERT LEXEME NAME", line: name.line})
         }
-
-        Ok(value)
     }
 
     fn stringify(&self, value: &Value) -> String {
@@ -181,7 +214,7 @@ impl TWInterp {
                     Some(expr) => self.evaluate(expr)?,
                     None => Value::Nil
                 };
-                self.environment.insert(name.lexeme.to_string(), value);
+                self.environment.define(name.lexeme.to_string(), value);
                 Ok(())
             }
         }
