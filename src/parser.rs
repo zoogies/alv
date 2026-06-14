@@ -3,6 +3,7 @@ use std::fmt::Error;
 use crate::{lexer::*, log::alv_error, parser::{Expr::Assign, Stmt::{ExpressionStmt, PrintStmt}}};
 
 // TODO: had to infect this with <'p> because of lexeme string slice reference...
+#[derive(Debug)]
 pub enum Expr<'p> {
     Assign {
         name: Token<'p>,
@@ -41,6 +42,7 @@ pub struct ParseError<'p> {
 
 type ParseResult<'p, T> = Result<T, ParseError<'p>>;
 
+#[derive(Debug)]
 pub enum Stmt<'p> {
     ExpressionStmt(Box<Expr<'p>>),
     PrintStmt(Box<Expr<'p>>),

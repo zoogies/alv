@@ -53,14 +53,15 @@ fn main() -> ExitCode {
     for tok in &tokens {
         alv_log!("tok {:?}",tok);
     }
-    
-    // no output, for now
-    // alv_log!("-------------   Parser Output    -------------");
 
     let mut p = Parser::new(&tokens);
     let e = p.parse();
     match e {
         Ok(e) => {
+            // println!("\n");
+            // alv_log!("-------------   Parser Output    -------------");
+            // println!("{:#?}", e);
+
             println!("\n");
             alv_log!("------------- Interpreter Output -------------");
             
