@@ -1,9 +1,9 @@
 use crate::{lexer::*, log::{alv_error, alv_log}, parser::*};
 
-use std::process::ExitCode;
+use std::{collections::HashMap, process::ExitCode};
 
 // currently shadows literal, but with global strings
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     String(String), // heap strings for runtime?
     Number(f64),
@@ -17,7 +17,10 @@ pub struct RuntimeError {
     pub line: usize
 }
 
-pub struct TWInterp;
+#[derive(Default)]
+pub struct TWInterp {
+    environment: HashMap<String,Value>
+}
 
 impl TWInterp {
     pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
@@ -26,6 +29,7 @@ impl TWInterp {
             Expr::Grouping { expression } => self.evaluate(expression),
             Expr::Unary { operator, right } => self.eval_unary(operator, right),
             Expr::Binary { left, operator, right } => self.eval_binary(left, operator, right),
+            Expr::Variable { name } => self.eval_variable(name)
         }
     }
 
@@ -123,6 +127,13 @@ impl TWInterp {
         }
     }
 
+    fn eval_variable(&self, name: &Token) -> Result<Value, RuntimeError> {
+        match self.environment.get(name.lexeme) {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError { message: "Undefined variable.", line: name.line })
+        }
+    }
+
     fn stringify(&self, value: &Value) -> String {
         match value {
             Value::String(s) => {
@@ -140,7 +151,7 @@ impl TWInterp {
         }
     }
 
-    fn execute(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::PrintStmt(pstmt) => {
                 let v: Value = self.evaluate(&*pstmt)?;
@@ -150,12 +161,20 @@ impl TWInterp {
             Stmt::ExpressionStmt(estmt) => {
                 self.evaluate(&*estmt)?;
                 Ok(())
+            },
+            Stmt::VarStmt { name, initializer } => {
+                let value = match initializer {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => Value::Nil
+                };
+                self.environment.insert(name.lexeme.to_string(), value);
+                Ok(())
             }
         }
     }
 
     // TODO: bubble out an exit code?
-    pub fn interpret(&self, stmts: &Vec<Stmt>) -> ExitCode {
+    pub fn interpret(&mut self, stmts: &Vec<Stmt>) -> ExitCode {
         for stmt in stmts {
             match self.execute(stmt) {
                 Ok(_v) => {

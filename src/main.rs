@@ -15,7 +15,6 @@ use lexer::Token;
 use lexer::TokenType;
 
 use parser::Parser;
-use parser::AstPrinter;
 use parser::Expr;
 
 fn print_usage() {
@@ -66,11 +65,11 @@ fn main() -> ExitCode {
             alv_log!("------------- Interpreter Output -------------");
             
             // TODO: should exit with code 70 if runtime error occurred
-            TWInterp.interpret(&e)
+            let mut i = TWInterp::default();
+            i.interpret(&e)
         },
         Err(_e) => {
             std::process::exit(65);
         }
     }
-    // AstPrinter.print(&e);
 }

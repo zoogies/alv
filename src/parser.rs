@@ -19,6 +19,9 @@ pub enum Expr<'p> {
         operator: Token<'p>,
         right: Box<Expr<'p>>
     },
+    Variable {
+        name: Token<'p>
+    }
 }
 
 pub struct Parser<'p> {
@@ -37,6 +40,7 @@ type ParseResult<'p, T> = Result<T, ParseError<'p>>;
 pub enum Stmt<'p> {
     ExpressionStmt(Box<Expr<'p>>),
     PrintStmt(Box<Expr<'p>>),
+    VarStmt{name: Token<'p>, initializer: Option<Box<Expr<'p>>>},
 }
 
 impl<'p> Parser<'p> {
@@ -137,6 +141,17 @@ impl<'p> Parser<'p> {
         self.primary()
     }
 
+    fn var_declaration(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name")?.clone();
+
+        let initializer = if self.match_token(&[TokenType::Equal]) {
+            Some(Box::new(self.expression()?))
+        } else { None };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration")?;
+        Ok(Stmt::VarStmt { name: name, initializer: initializer })
+    }
+
     fn primary(&mut self) -> ParseResult<'p, Expr<'p>> {
         if self.match_token(&[TokenType::False]) { return Ok(Expr::Literal { value: Literal::Bool(false) }); }
         if self.match_token(&[TokenType::True])  { return Ok(Expr::Literal { value: Literal::Bool(true)  }); }
@@ -150,6 +165,10 @@ impl<'p> Parser<'p> {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
             return Ok(Expr::Grouping { expression: Box::new(expr) });
+        }
+
+        if self.match_token(&[TokenType::Identifier]) {
+            return Ok(Expr::Variable { name: self.previous().clone() })
         }
 
         Err(self.error(self.peek(), "Expect expression."))
@@ -225,7 +244,7 @@ impl<'p> Parser<'p> {
         let mut v: Vec<Stmt> = Vec::new();
         let mut had_error = false;
         while !self.is_at_end() {
-            match self.statement() {
+            match self.declaration() {
                 Ok(s) => v.push(s),
                 Err(_e) => { had_error = true; self.synchronize(); },
             }
@@ -234,6 +253,13 @@ impl<'p> Parser<'p> {
         if had_error { return Err(()); }
         
         Ok(v)
+    }
+
+    fn declaration(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        if self.match_token(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+        self.statement()
     }
 
     fn statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
@@ -270,72 +296,4 @@ impl<'p> Parser<'p> {
         }
     }
 
-}
-
-// --------------------- printer ---------------------
-
-pub struct AstPrinter;
-
-impl AstPrinter {
-    pub fn print<'s>(&self, expr: &Expr<'s>) -> String {
-        self.print_expr(expr)
-    }
-
-    fn print_expr<'s>(&self, expr: &Expr<'s>) -> String {
-        match expr {
-            Expr::Binary {
-                left,
-                operator,
-                right
-            } => {
-                self.parenthesize(
-                    operator.lexeme,
-                    &[left.as_ref(), right.as_ref()],
-                )
-            }
-
-            Expr::Grouping { expression} => {
-                self.parenthesize(
-                    "group",
-                    &[expression.as_ref()],
-                )
-            }
-
-            Expr::Literal { value } => {
-                self.print_literal(value)
-            }
-
-            Expr::Unary { operator, right } => {
-                self.parenthesize(
-                    operator.lexeme,
-                    &[right.as_ref()],
-                )
-            }
-        }
-    }
-
-    fn print_literal<'s>(&self, value: &Literal<'s>) -> String {
-        match value {
-            Literal::Number(n) => n.to_string(),
-            Literal::String(s) => s.to_string(),
-            Literal::Bool(b) => b.to_string(),
-            Literal::Nil => "nil".to_string()
-        }
-    }
-
-    fn parenthesize<'s>(&self, name: &str, exprs: &[&Expr<'s>]) -> String {
-        let mut out = String::new();
-
-        out.push('(');
-        out.push_str(name);
-
-        for expr in exprs {
-            out.push(' ');
-            out.push_str(&self.print_expr(expr));
-        }
-
-        out.push(')');
-
-        out
-    }
 }
