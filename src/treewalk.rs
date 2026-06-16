@@ -54,7 +54,7 @@ impl Environment {
 
 #[derive(Default)]
 pub struct TWInterp {
-    environment: Environment
+    environment: Rc<RefCell<Environment>>
 }
 
 impl TWInterp {
@@ -164,7 +164,7 @@ impl TWInterp {
     }
 
     fn eval_variable(&mut self, name: &Token) -> Result<Value, RuntimeError> {
-        match self.environment.get(name.lexeme) {
+        match self.environment.borrow().get(name.lexeme) {
             Some(v) => Ok(v),
             None => Err(RuntimeError { message: "Undefined variable.", line: name.line })
         }
@@ -173,7 +173,7 @@ impl TWInterp {
     fn eval_assign(&mut self, name: &Token, value: &Expr) -> Result<Value, RuntimeError> {
         let value = self.evaluate(value)?;
         
-        if self.environment.assign(name.lexeme, value.clone()) {
+        if self.environment.borrow_mut().assign(name.lexeme, value.clone()) {
             Ok(value)
         }
         else {
@@ -214,7 +214,22 @@ impl TWInterp {
                     Some(expr) => self.evaluate(expr)?,
                     None => Value::Nil
                 };
-                self.environment.define(name.lexeme.to_string(), value);
+                self.environment.borrow_mut().define(name.lexeme.to_string(), value);
+                Ok(())
+            },
+            Stmt::BlockStmt { statements } => {
+                self.environment = Rc::new(RefCell::new(Environment {
+                    environment: HashMap::new(),
+                    enclosing: Some(Rc::clone(&self.environment))
+                }));
+
+                for statement in statements {
+                    self.execute(statement)?;
+                }
+
+                let parent = self.environment.borrow().enclosing.clone().unwrap();
+                self.environment = parent;
+
                 Ok(())
             }
         }

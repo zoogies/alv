@@ -47,6 +47,7 @@ pub enum Stmt<'p> {
     ExpressionStmt(Box<Expr<'p>>),
     PrintStmt(Box<Expr<'p>>),
     VarStmt{name: Token<'p>, initializer: Option<Box<Expr<'p>>>},
+    BlockStmt{statements: Vec<Stmt<'p>>}
 }
 
 impl<'p> Parser<'p> {
@@ -295,6 +296,10 @@ impl<'p> Parser<'p> {
             return self.print_statement();
         }
 
+        if self.match_token(&[TokenType::LeftBrace]) {
+            return self.block_statement();
+        }
+
         self.expression_statement()
     }
 
@@ -302,6 +307,18 @@ impl<'p> Parser<'p> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(PrintStmt(Box::new(expr)))
+    }
+
+    fn block_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        let mut statements: Vec<Stmt<'p>> =  Vec::new();
+
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.");
+        
+        Ok(Stmt::BlockStmt { statements })
     }
 
     fn expression_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
