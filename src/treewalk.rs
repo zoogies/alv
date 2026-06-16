@@ -66,6 +66,7 @@ impl TWInterp {
             Expr::Binary { left, operator, right } => self.eval_binary(left, operator, right),
             Expr::Variable { name } => self.eval_variable(name),
             Expr::Assign { name, value } => self.eval_assign(name, value),
+            Expr::Logical { left, operator, right } => self.eval_logical(left, operator, right)
         }
     }
 
@@ -179,6 +180,19 @@ impl TWInterp {
         else {
             Err(RuntimeError {message: "Undefined variable TODO INSERT LEXEME NAME", line: name.line})
         }
+    }
+
+    fn eval_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
+        let left = self.evaluate(left)?;
+
+        if operator.token_type == TokenType::Or {
+            if self.is_truthy(&left) { return Ok(left); }
+        }
+        else {
+            if !self.is_truthy(&left) { return Ok(left); }
+        }
+
+        self.evaluate(right)
     }
 
     fn stringify(&self, value: &Value) -> String {

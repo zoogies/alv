@@ -20,6 +20,11 @@ pub enum Expr<'p> {
     Literal {
         value: Literal<'p>
     },
+    Logical {
+        left: Box<Expr<'p>>,
+        operator: Token<'p>,
+        right: Box<Expr<'p>>,
+    },
     Unary {
         operator: Token<'p>,
         right: Box<Expr<'p>>
@@ -62,7 +67,7 @@ impl<'p> Parser<'p> {
     // --------------------- operators ---------------------
 
     fn assignment(&mut self) -> ParseResult<'p, Expr<'p>> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.match_token(&[TokenType::Equal]) {
             let equals = self.previous();
@@ -98,6 +103,34 @@ impl<'p> Parser<'p> {
                 left: Box::new(expr),
                 operator: operator,
                 right: Box::new(right)
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr<'p>, ParseError<'p>> {
+        let mut expr = self.and()?;
+
+        while self.match_token(&[TokenType::Or]) {
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator: self.previous().clone(),
+                right: Box::new(self.and()?)
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr<'p>, ParseError<'p>> {
+        let mut expr = self.equality()?;
+
+        while self.match_token(&[TokenType::And]) {
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator: self.previous().clone(),
+                right: Box::new(self.equality()?)
             }
         }
 
