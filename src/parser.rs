@@ -354,15 +354,15 @@ impl<'p> Parser<'p> {
             statements.push(self.declaration()?);
         }
 
-        self.consume(TokenType::RightBrace, "Expect '}' after block.");
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
         
         Ok(Stmt::BlockStmt { statements })
     }
 
     fn if_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
-        self.consume(TokenType::RightParen, "Expect ')' after if condition.");
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
 
         Ok(Stmt::IfStmt {
             condition,
