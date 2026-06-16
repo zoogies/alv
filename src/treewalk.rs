@@ -231,6 +231,17 @@ impl TWInterp {
                 self.environment = parent;
 
                 Ok(())
+            },
+            Stmt::IfStmt { condition, then_branch, else_branch } => {
+                let condition_value = self.evaluate(condition)?;
+                if self.is_truthy(&condition_value) {
+                    self.execute(&then_branch)?;
+                }
+                else if else_branch.is_some() {
+                    self.execute(&else_branch.as_ref().unwrap())?;
+                }
+
+                Ok(())
             }
         }
     }

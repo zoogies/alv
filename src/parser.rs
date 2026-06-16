@@ -47,7 +47,8 @@ pub enum Stmt<'p> {
     ExpressionStmt(Box<Expr<'p>>),
     PrintStmt(Box<Expr<'p>>),
     VarStmt{name: Token<'p>, initializer: Option<Box<Expr<'p>>>},
-    BlockStmt{statements: Vec<Stmt<'p>>}
+    BlockStmt{statements: Vec<Stmt<'p>>},
+    IfStmt{condition: Expr<'p>, then_branch: Box<Stmt<'p>>, else_branch: Option<Box<Stmt<'p>>> }
 }
 
 impl<'p> Parser<'p> {
@@ -300,6 +301,10 @@ impl<'p> Parser<'p> {
             return self.block_statement();
         }
 
+        if self.match_token(&[TokenType::If]) {
+            return self.if_statement();
+        }
+
         self.expression_statement()
     }
 
@@ -319,6 +324,21 @@ impl<'p> Parser<'p> {
         self.consume(TokenType::RightBrace, "Expect '}' after block.");
         
         Ok(Stmt::BlockStmt { statements })
+    }
+
+    fn if_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.");
+
+        Ok(Stmt::IfStmt {
+            condition,
+            then_branch:
+                Box::new(self.statement()?),
+            else_branch:
+                if self.match_token(&[TokenType::Else]) { Some(Box::new(self.statement()?)) }
+                else { None }
+        })
     }
 
     fn expression_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
