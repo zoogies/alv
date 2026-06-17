@@ -256,6 +256,15 @@ impl TWInterp {
                 }
 
                 Ok(())
+            },
+            Stmt::WhileStmt { condition, body } => {
+                loop {
+                    let condition_value = self.evaluate(condition)?;
+
+                    if self.is_truthy(&condition_value) { self.execute(body)?; }
+                    else { break; }
+                }
+                Ok(())
             }
         }
     }
