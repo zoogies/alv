@@ -1,6 +1,6 @@
 use std::fmt::Error;
 
-use crate::{lexer::*, log::alv_error, parser::{Expr::Assign, Stmt::{ExpressionStmt, PrintStmt}}};
+use crate::{lexer::{TokenType::Semicolon, *}, log::alv_error, parser::{Expr::Assign, Stmt::{ExpressionStmt, PrintStmt}}};
 
 // TODO: had to infect this with <'p> because of lexeme string slice reference...
 #[derive(Debug)]
@@ -343,6 +343,10 @@ impl<'p> Parser<'p> {
             return self.while_statement();
         }
 
+        if self.match_token( &[TokenType::For]) {
+            return self.desugaring_for();
+        }
+
         self.expression_statement()
     }
 
@@ -385,6 +389,50 @@ impl<'p> Parser<'p> {
         self.consume(TokenType::RightParen ,"Expect ')' after 'while'.")?;
 
         Ok(Stmt::WhileStmt { condition, body: Box::new(self.statement()?) })
+    }
+
+    fn desugaring_for(&mut self) -> ParseResult<'p, Stmt<'p>> {
+        self.consume(TokenType::LeftParen, "Expected '(' after 'for'.")?;
+
+        let initializer: Option<Stmt>;
+        if self.match_token(&[TokenType::Semicolon]) {
+            initializer = None;
+        }
+        else if self.match_token(&[TokenType::Var]) {
+            initializer = Some(self.var_declaration()?);
+        }
+        else {
+            initializer = Some(self.expression_statement()?);
+        }
+
+        let mut condition: Option<Expr<'p>> = None;
+        if !self.check(TokenType::Semicolon) {
+            condition = Some(self.expression()?);
+        }
+        self.consume(TokenType::Semicolon, "Expected ';' after loop condition.")?;
+
+        let mut increment: Option<Expr<'p>> = None;
+        if !self.check(TokenType::RightParen) {
+            increment = Some(self.expression()?);
+        }
+        self.consume(TokenType::RightParen, "Expected ')' after for clauses.")?;
+
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::BlockStmt { statements: vec![body, Stmt::ExpressionStmt(Box::new(increment))] }
+        }
+
+        body = Stmt::WhileStmt {
+            condition: condition.unwrap_or_else(|| Expr::Literal { value: Literal::Bool(true) }),
+            body: Box::new(body)
+        };
+
+        if let Some(initializer) = initializer {
+            body = Stmt::BlockStmt { statements: vec![initializer, body] }
+        }
+
+        Ok(body)
     }
 
     fn expression_statement(&mut self) -> ParseResult<'p, Stmt<'p>> {
