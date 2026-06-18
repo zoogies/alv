@@ -47,23 +47,23 @@ impl TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub enum Literal<'p> {
-    String(&'p str),
+pub enum Literal {
+    String(String),
     Number(f64),
     Bool(bool),
     Nil,
 }
 
 #[derive(Debug, Clone)]
-pub struct Token<'p> {
+pub struct Token {
     pub token_type: TokenType,
-    pub lexeme: &'p str,
+    pub lexeme: String,
     pub line: usize,
-    pub literal: Option<Literal<'p>>,
+    pub literal: Option<Literal>,
 }
 
-impl<'p> Token<'p> {
-    fn new(token_type: TokenType, lexeme: &'p str, line: usize, lit: Option<Literal<'p>>) -> Self {
+impl<'p> Token {
+    fn new(token_type: TokenType, lexeme: String, line: usize, lit: Option<Literal>) -> Self {
         Self {
             token_type,
             lexeme,
@@ -75,7 +75,7 @@ impl<'p> Token<'p> {
 
 pub struct Lexer<'p> {
     input: &'p str, 
-    tokens: Vec<Token<'p>>,
+    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
@@ -125,18 +125,18 @@ impl<'p> Lexer<'p> {
         self.tokens.push(
             Token::new(
                 token_type, 
-                &self.input[self.start..self.current], 
+                self.input[self.start..self.current].to_string(), 
                 self.line,
                 None
             )
         );
     }
 
-    fn add_token_literal(&mut self, token_type: TokenType, lit: Literal<'p>) {
+    fn add_token_literal(&mut self, token_type: TokenType, lit: Literal) {
         self.tokens.push(
             Token::new(
                 token_type, 
-                &self.input[self.start..self.current], 
+                self.input[self.start..self.current].to_string(), 
                 self.line,
                 Some(lit)
             )
@@ -183,7 +183,7 @@ impl<'p> Lexer<'p> {
         // closing "
         self.advance();
 
-        self.add_token_literal(TokenType::Str, Literal::String(&self.input[self.start+1..self.current-1]));
+        self.add_token_literal(TokenType::Str, Literal::String(self.input[self.start+1..self.current-1].to_string()));
     }
 
     fn is_digit(&self, c: char) -> bool {
@@ -273,7 +273,7 @@ impl<'p> Lexer<'p> {
         }
     }
 
-    pub fn scan_tokens(mut self) -> Vec<Token<'p>> {
+    pub fn scan_tokens(mut self) -> Vec<Token> {
         while !self.is_at_end() {
             // alv_log!("self.current: {} self.input[self.current]: {:?}\n",self.current,self.input.chars().nth(self.current));
 
@@ -281,7 +281,7 @@ impl<'p> Lexer<'p> {
             self.scan_token();
         }
 
-        self.tokens.push(Token { token_type: TokenType::EndFile, lexeme: "", line: self.line, literal: None });
+        self.tokens.push(Token { token_type: TokenType::EndFile, lexeme: "".to_string(), line: self.line, literal: None });
         
         self.tokens
     }

@@ -54,7 +54,7 @@ fn main() -> ExitCode {
         alv_log!("tok {:?}",tok);
     }
 
-    let mut p = Parser::new(&tokens);
+    let mut p = Parser::new(tokens);
     let e = p.parse();
     match e {
         Ok(e) => {
