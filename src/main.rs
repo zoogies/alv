@@ -66,7 +66,7 @@ fn main() -> ExitCode {
             alv_log!("------------- Interpreter Output -------------");
             
             // TODO: should exit with code 70 if runtime error occurred
-            let mut i = TWInterp::default();
+            let mut i = TWInterp::new();
             i.interpret(&e)
         },
         Err(_e) => {
