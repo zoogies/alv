@@ -43,16 +43,16 @@ fn main() -> ExitCode {
 
     alv_log!("-------------   Input Program    -------------");
     println!("{}\n", program);
-    alv_log!("-------------    Lexer Output    -------------");
+    // alv_log!("-------------    Lexer Output    -------------");
 
     let l = lexer::Lexer::new(&program);
     
     let tokens = l.scan_tokens();
 
-    alv_log!("tokens length: {}", tokens.len());
-    for tok in &tokens {
-        alv_log!("tok {:?}",tok);
-    }
+    // alv_log!("tokens length: {}", tokens.len());
+    // for tok in &tokens {
+    // alv_log!("tok {:?}",tok);
+    // }
 
     let mut p = Parser::new(tokens);
     let e = p.parse();
@@ -62,7 +62,7 @@ fn main() -> ExitCode {
             // alv_log!("-------------   Parser Output    -------------");
             // println!("{:#?}", e);
 
-            println!("\n");
+            // println!("\n");
             alv_log!("------------- Interpreter Output -------------");
             
             // TODO: should exit with code 70 if runtime error occurred

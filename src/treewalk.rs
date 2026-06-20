@@ -1,11 +1,12 @@
-use crate::{lexer::*, log::{alv_error, alv_log}, parser::*};
+use crate::{lexer::*, log::{alv_error, alv_log}, parser::*, treewalk::Function::{LoxFunction, NativeFunction}};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use std::{cell::RefCell, collections::HashMap, default, process::ExitCode, rc::Rc};
 
 #[derive(Debug, Clone)]
 enum Function {
-    NativeFunction(fn(&mut TWInterp, &[Value]) -> Result<Value, RuntimeError>)
+    NativeFunction{arity: usize, imp: fn(&mut TWInterp, &[Value]) -> Result<Value, RuntimeError>},
+    LoxFunction{name: Token, params: Vec<Token>, body: Vec<Stmt>}
 }
 
 // currently shadows literal, but with global strings
@@ -15,7 +16,7 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Nil,
-    Callable { arity: usize, imp: Function },
+    Function(Function)
 }
 
 // needs new lifetime specifier later if you add AST/token slices
@@ -62,7 +63,7 @@ impl Environment {
 #[derive(Default)]
 pub struct TWInterp {
     environment: Rc<RefCell<Environment>>,
-    globals: Environment
+    globals: Rc<RefCell<Environment>>
 }
 
 impl TWInterp {
@@ -213,11 +214,16 @@ impl TWInterp {
         }
 
 
-        let Value::Callable{arity, imp} = &callee else {
+        let Value::Function(f) = &callee else {
             return Err(RuntimeError{message: "Can only call functions and classes.".to_string(), line:paren.line});
         };
 
-        if args.len() != *arity {
+        let arity = match f {
+            Function::LoxFunction { name: _name, params, body: _body } => {params.len()},
+            Function::NativeFunction { arity: ar, imp: _imp } => {*ar}
+        };
+
+        if args.len() != arity {
             return Err(RuntimeError{message: format!("Expected {} arguments but got {}.", arity, args.len()), line:paren.line});
         }
 
@@ -225,7 +231,33 @@ impl TWInterp {
     }
 
     fn call_function(&mut self, f: &Value, args: &Vec<Value>) -> Result<Value, RuntimeError> {
-        Ok(Value::Nil) // TODO
+        let f = match f {
+            Value::Function(f) => {f},
+            _ => { return Err(RuntimeError{message: "Cannot call_function on non-function Value.".to_string(), line: 0}); }
+            // ^^ HOW TF DO I GET A LINE NUMBER HERE? DO I CARE? TODO
+        };
+
+        match f {
+            NativeFunction { arity, imp } => {
+                Ok(imp(self, args)?)
+            },
+            LoxFunction { name, params, body } => {
+                let e = Rc::new(RefCell::new(
+                    Environment {
+                        enclosing: Some(Rc::clone(&self.globals)),
+                        environment: HashMap::new()
+                    }
+                ));
+
+                for (i, arg) in args.iter().enumerate() {
+                    e.borrow_mut().define(params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
+                }
+
+                self.execute_block(body, e)?;
+
+                Ok(Value::Nil)
+            }
+        }
     }
 
     fn stringify(&self, value: &Value) -> String {
@@ -242,10 +274,22 @@ impl TWInterp {
             Value::Nil => {
                 "Nil".to_string()
             },
-            Value::Callable {arity: _arity, imp: _imp} => {
-                "Function".to_string() // TODO
+            Value::Function(f) => {
+                match f {
+                    NativeFunction { .. } => { "<NATIVE FUNCTION>".to_string() },
+                    LoxFunction { name, .. } => { format!("<Fn {}>", name.lexeme) }
+                }
             }
         }
+    }
+
+    fn execute_block(&mut self, blocks: &Vec<Stmt>, env: Rc<RefCell<Environment>>) -> Result<(), RuntimeError> {
+        let prev = Rc::clone(&self.environment);
+        self.environment = env;
+        let res = blocks.iter().try_for_each(|s| self.execute(s));
+        self.environment = prev;
+
+        res
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
@@ -268,19 +312,12 @@ impl TWInterp {
                 Ok(())
             },
             Stmt::BlockStmt { statements } => {
-                self.environment = Rc::new(RefCell::new(Environment {
+                let e = Rc::new(RefCell::new(Environment {
                     environment: HashMap::new(),
                     enclosing: Some(Rc::clone(&self.environment))
                 }));
 
-                for statement in statements {
-                    self.execute(statement)?;
-                }
-
-                let parent = self.environment.borrow().enclosing.clone().unwrap();
-                self.environment = parent;
-
-                Ok(())
+                Ok(self.execute_block(statements, e)?)
             },
             Stmt::IfStmt { condition, then_branch, else_branch } => {
                 let condition_value = self.evaluate(condition)?;
@@ -300,6 +337,16 @@ impl TWInterp {
                     if self.is_truthy(&condition_value) { self.execute(body)?; }
                     else { break; }
                 }
+                Ok(())
+            },
+            Stmt::Function { name, params, body } => {
+                self.environment.borrow_mut().define(
+                    name.lexeme.clone(),
+                    Value::Function(
+                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone() }
+                    )
+                );
+
                 Ok(())
             }
         }
@@ -324,10 +371,11 @@ impl TWInterp {
     pub fn new() -> Self {
         let mut s = Self {
             environment: Rc::new(RefCell::new(Environment::default())),
-            globals: Environment::default()
+            globals: Rc::new(RefCell::new(Environment::default()))
         };
+        s.environment = Rc::clone(&s.globals);
 
-        register_natives(&mut s.globals);
+        register_natives(&mut s.globals.borrow_mut());
 
         s
     }
@@ -337,7 +385,7 @@ impl TWInterp {
 // NATIVE FUNCTIONS
 
 fn register_natives(env: &mut Environment) {
-    env.define("clock".to_string(), Value::Callable { arity: 0, imp: Function::NativeFunction(clock) });
+    env.define("clock".to_string(), Value::Function(Function::NativeFunction { arity: 0, imp: clock }));
 }
 
 fn clock(_interp: &mut TWInterp, _args: &[Value]) -> Result<Value, RuntimeError> {
