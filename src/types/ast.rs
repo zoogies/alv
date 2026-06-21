@@ -38,12 +38,24 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    ExpressionStmt(Box<Expr>),
-    PrintStmt(Box<Expr>),
-    VarStmt{name: Token, initializer: Option<Box<Expr>>},
-    BlockStmt{statements: Vec<Stmt>},
-    IfStmt{condition: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>> },
-    WhileStmt{condition: Expr, body: Box<Stmt>},
+    Expression(Box<Expr>),
+    Print(Box<Expr>),
+    Var{
+        name: Token,
+        initializer: Option<Box<Expr>>
+    },
+    Block{
+        statements: Vec<Stmt>
+    },
+    If{
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>
+    },
+    While{
+        condition: Expr,
+        body: Box<Stmt>
+    },
     Function {
         name: Token,
         params: Vec<Token>,

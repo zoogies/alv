@@ -224,16 +224,16 @@ impl TWInterp {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
-            Stmt::PrintStmt(pstmt) => {
+            Stmt::Print(pstmt) => {
                 let v: Value = self.evaluate(&*pstmt)?;
                 alv_log!("{}",alv_stringify(&v));
                 Ok(())
             },
-            Stmt::ExpressionStmt(estmt) => {
+            Stmt::Expression(estmt) => {
                 self.evaluate(&*estmt)?;
                 Ok(())
             },
-            Stmt::VarStmt { name, initializer } => {
+            Stmt::Var { name, initializer } => {
                 let value = match initializer {
                     Some(expr) => self.evaluate(expr)?,
                     None => Value::Nil
@@ -241,7 +241,7 @@ impl TWInterp {
                 self.environment.borrow_mut().define(name.lexeme.to_string(), value);
                 Ok(())
             },
-            Stmt::BlockStmt { statements } => {
+            Stmt::Block { statements } => {
                 let e = Rc::new(RefCell::new(Environment {
                     environment: HashMap::new(),
                     enclosing: Some(Rc::clone(&self.environment))
@@ -249,7 +249,7 @@ impl TWInterp {
 
                 Ok(self.execute_block(statements, e)?)
             },
-            Stmt::IfStmt { condition, then_branch, else_branch } => {
+            Stmt::If { condition, then_branch, else_branch } => {
                 let condition_value = self.evaluate(condition)?;
                 if self.is_truthy(&condition_value) {
                     self.execute(&then_branch)?;
@@ -260,7 +260,7 @@ impl TWInterp {
 
                 Ok(())
             },
-            Stmt::WhileStmt { condition, body } => {
+            Stmt::While { condition, body } => {
                 loop {
                     let condition_value = self.evaluate(condition)?;
 

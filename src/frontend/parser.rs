@@ -207,7 +207,7 @@ impl Parser {
         } else { None };
 
         self.consume(TokenType::Semicolon, "Expect ';' after variable declaration".to_string())?;
-        Ok(Stmt::VarStmt { name: name, initializer: initializer })
+        Ok(Stmt::Var { name: name, initializer: initializer })
     }
 
     fn primary(&mut self) -> ParseResult<Expr> {
@@ -329,7 +329,7 @@ impl Parser {
         }
 
         if self.match_token(&[TokenType::LeftBrace]) {
-            return Ok(Stmt::BlockStmt { statements: self.block_statement()? });
+            return Ok(Stmt::Block { statements: self.block_statement()? });
         }
 
         if self.match_token(&[TokenType::If]) {
@@ -350,7 +350,7 @@ impl Parser {
     fn print_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
-        Ok(Stmt::PrintStmt(Box::new(expr)))
+        Ok(Stmt::Print(Box::new(expr)))
     }
 
     fn block_statement(&mut self) -> ParseResult<Vec<Stmt>> {
@@ -370,7 +370,7 @@ impl Parser {
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition.".to_string())?;
 
-        Ok(Stmt::IfStmt {
+        Ok(Stmt::If {
             condition,
             then_branch:
                 Box::new(self.statement()?),
@@ -385,7 +385,7 @@ impl Parser {
         let condition = self.expression()?;
         self.consume(TokenType::RightParen ,"Expect ')' after 'while'.".to_string())?;
 
-        Ok(Stmt::WhileStmt { condition, body: Box::new(self.statement()?) })
+        Ok(Stmt::While { condition, body: Box::new(self.statement()?) })
     }
 
     fn function(&mut self, kind: &str) -> ParseResult<Stmt> {
@@ -444,16 +444,16 @@ impl Parser {
         let mut body = self.statement()?;
 
         if let Some(increment) = increment {
-            body = Stmt::BlockStmt { statements: vec![body, Stmt::ExpressionStmt(Box::new(increment))] }
+            body = Stmt::Block { statements: vec![body, Stmt::Expression(Box::new(increment))] }
         }
 
-        body = Stmt::WhileStmt {
+        body = Stmt::While {
             condition: condition.unwrap_or_else(|| Expr::Literal { value: Literal::Bool(true) }),
             body: Box::new(body)
         };
 
         if let Some(initializer) = initializer {
-            body = Stmt::BlockStmt { statements: vec![initializer, body] }
+            body = Stmt::Block { statements: vec![initializer, body] }
         }
 
         Ok(body)
@@ -462,7 +462,7 @@ impl Parser {
     fn expression_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
-        Ok(Stmt::ExpressionStmt(Box::new(expr)))
+        Ok(Stmt::Expression(Box::new(expr)))
     }
 
     fn synchronize(&mut self) {
