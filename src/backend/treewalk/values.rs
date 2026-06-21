@@ -1,11 +1,19 @@
 use crate::types::token::Token;
 use crate::types::ast::Stmt;
 use super::TWInterp;
+use crate::backend::treewalk::environment::Environment;
+
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub enum Function {
     NativeFunction{arity: usize, imp: fn(&mut TWInterp, &[Value]) -> Result<Value, RuntimeError>},
-    LoxFunction{name: Token, params: Vec<Token>, body: Vec<Stmt>}
+    LoxFunction{
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+        closure: Rc<RefCell<Environment>>
+    }
 }
 
 // currently shadows literal, but with global strings

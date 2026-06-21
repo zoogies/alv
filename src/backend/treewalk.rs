@@ -172,7 +172,7 @@ impl TWInterp {
         };
 
         let arity = match f {
-            Function::LoxFunction { name: _name, params, body: _body } => {params.len()},
+            Function::LoxFunction { params, ..} => {params.len()},
             Function::NativeFunction { arity: ar, imp: _imp } => {*ar}
         };
 
@@ -194,10 +194,10 @@ impl TWInterp {
             Function::NativeFunction { imp, .. } => {
                 Ok(imp(self, args)?)
             },
-            Function::LoxFunction { params, body, .. } => {
+            Function::LoxFunction { params, body, closure, .. } => {
                 let e = Rc::new(RefCell::new(
                     Environment {
-                        enclosing: Some(Rc::clone(&self.globals)),
+                        enclosing: Some(Rc::clone(closure)),
                         environment: HashMap::new()
                     }
                 ));
@@ -289,7 +289,7 @@ impl TWInterp {
                 self.environment.borrow_mut().define(
                     name.lexeme.clone(),
                     Value::Function(
-                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone() }
+                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: Rc::clone(&self.environment) }
                     )
                 );
 

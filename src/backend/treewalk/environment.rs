@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::values::*;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Environment {
     pub environment: HashMap<String,Value>,
     pub enclosing: Option<Rc<RefCell<Environment>>>
