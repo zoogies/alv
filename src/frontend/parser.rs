@@ -1,6 +1,5 @@
 use crate::types::token::*;
 use crate::types::ast::*;
-use crate::util::log::*;
 
 pub struct Parser {
     tokens: Vec<Token>,

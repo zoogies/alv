@@ -128,13 +128,6 @@ impl TWInterp {
         }
     }
 
-    fn eval_variable(&mut self, name: &Token) -> Result<Value, RuntimeError> {
-        match self.environment.borrow().get(&name.lexeme) {
-            Some(v) => Ok(v),
-            None => Err(RuntimeError { message: "Undefined variable.".to_string(), line: name.line })
-        }
-    }
-
     fn eval_assign(&mut self, name: &Token, value: &Expr, id: usize) -> Result<Value, RuntimeError> {
         let value = self.evaluate(value)?;
         
