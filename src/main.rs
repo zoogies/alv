@@ -3,55 +3,66 @@ use alv::backend::treewalk::TWInterp;
 
 use alv::{alv_error, alv_log};
 
-use std::env;
 use std::process::ExitCode;
 
-fn print_usage() {
-    println!("usage: alv <input file>.alv");
+use clap::Parser as ClapParser;
+
+#[derive(ClapParser)]
+#[command(name= "alv")]
+struct Cli {
+    /// Path to the .alv source file
+    input: String,
+    
+    /// Print the input program
+    #[arg(long)]
+    print_program: bool,
+
+    /// Dump the lexer token stream
+    #[arg(long)]
+    print_tokens: bool,
+    
+    /// Dump the AST after parsing
+    #[arg(long)]
+    print_ast: bool,
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = env::args().collect();
-    let argc = args.len();
+    let cli = Cli::parse();
 
-    // for now just take one file as input
-    if argc < 2 || argc >= 3 {
-        print_usage();
-        return ExitCode::FAILURE
-    }
-
-    let input_path = &args[1];
-
-    let program = match std::fs::read_to_string(input_path) {
+    let program = match std::fs::read_to_string(&cli.input) {
         Ok(program) => program,
         Err(error) => {
-            alv_error!("failed to read '{}': {}", input_path, error);
+            alv_error!("failed to read '{}': {}", cli.input, error);
             return ExitCode::FAILURE;
         }
     };
 
-    alv_log!("-------------   Input Program    -------------");
-    println!("{}\n", program);
-    // alv_log!("-------------    Lexer Output    -------------");
+    if cli.print_program {
+        alv_log!("-------------   Input Program    -------------");
+        println!("{}", program);
+        println!("\n");
+    }
 
     let l = lexer::Lexer::new(&program);
-    
     let tokens = l.scan_tokens();
 
-    // alv_log!("tokens length: {}", tokens.len());
-    // for tok in &tokens {
-    // alv_log!("tok {:?}",tok);
-    // }
+    if cli.print_tokens {
+        alv_log!("-------------    Lexer Output    -------------");
+        alv_log!("tokens length: {}", tokens.len());
+        for tok in &tokens {
+            alv_log!("tok {:?}",tok);
+        }
+    }
 
-    let mut p = Parser::new(tokens);
-    let e = p.parse();
-    match e {
+    match Parser::new(tokens).parse() {
         Ok(e) => {
-            // println!("\n");
-            // alv_log!("-------------   Parser Output    -------------");
-            // println!("{:#?}", e);
+            if cli.print_ast {
+                println!("\n");
+                alv_log!("-------------   Parser Output    -------------");
+                println!("{:#?}", e);
+            }
 
-            // println!("\n");
+            println!("\n");
             alv_log!("------------- Interpreter Output -------------");
             
             // TODO: should exit with code 70 if runtime error occurred

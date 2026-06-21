@@ -18,7 +18,20 @@ pub enum Value {
     Function(Function)
 }
 
-// needs new lifetime specifier later if you add AST/token slices
+pub enum Interrupt {
+    Return{
+        keyword: Token,
+        value: Option<Value>
+    },
+    Error(RuntimeError)
+}
+
+impl From<RuntimeError> for Interrupt {
+    fn from(e: RuntimeError) -> Self {
+        Interrupt::Error(e)
+    }
+}
+
 pub struct RuntimeError {
     pub message: String,
     pub line: usize

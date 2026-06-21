@@ -206,14 +206,30 @@ impl TWInterp {
                     e.borrow_mut().define(params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
                 }
 
-                self.execute_block(body, e)?;
-
-                Ok(Value::Nil)
+                let r = self.execute_block(body, e);
+                match r {
+                    Ok(..) => {
+                        Ok(Value::Nil)
+                    },
+                    Err(Interrupt::Return { value, .. }) => {
+                        match value {
+                            None => {
+                                Ok(Value::Nil)
+                            },
+                            Some(s) => {
+                                Ok(s)
+                            }
+                        }
+                    },
+                    Err(Interrupt::Error(e)) => {
+                        Err(e)
+                    }
+                }
             }
         }
     }
 
-    fn execute_block(&mut self, blocks: &Vec<Stmt>, env: Rc<RefCell<Environment>>) -> Result<(), RuntimeError> {
+    fn execute_block(&mut self, blocks: &Vec<Stmt>, env: Rc<RefCell<Environment>>) -> Result<(), Interrupt> {
         let prev = Rc::clone(&self.environment);
         self.environment = env;
         let res = blocks.iter().try_for_each(|s| self.execute(s));
@@ -222,7 +238,7 @@ impl TWInterp {
         res
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), Interrupt> {
         match stmt {
             Stmt::Print(pstmt) => {
                 let v: Value = self.evaluate(&*pstmt)?;
@@ -278,6 +294,16 @@ impl TWInterp {
                 );
 
                 Ok(())
+            },
+            Stmt::Return { keyword, value } => {
+                match value {
+                    None => {
+                        return Err(Interrupt::Return { keyword: keyword.clone(), value: None });
+                    },
+                    Some(v) => {
+                        Err(Interrupt::Return{keyword: keyword.clone(), value: Some(self.evaluate(&v)?)})
+                    }
+                }
             }
         }
     }
@@ -290,7 +316,14 @@ impl TWInterp {
                     // alv_log!("Treewalk output: {:?}", v); // TODO: FIX
                 },
                 Err(error) => {
-                    alv_error!("Runtime error on line {}! {}", error.line + 1, error.message);
+                    match error {
+                        Interrupt::Error(error) => {
+                            alv_error!("Runtime error on line {}! {}", error.line + 1, error.message);
+                        },
+                        Interrupt::Return{keyword, ..} => {
+                            alv_error!("Runtime error on line {}! Trying to return a value from non-returning scoped block.", keyword.line + 1);
+                        }
+                    }
                     return ExitCode::FAILURE;
                 }
             }

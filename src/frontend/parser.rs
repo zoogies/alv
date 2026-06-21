@@ -328,6 +328,10 @@ impl Parser {
             return self.print_statement();
         }
 
+        if self.match_token(&[TokenType::Return]) {
+            return self.return_statement();
+        }
+
         if self.match_token(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block { statements: self.block_statement()? });
         }
@@ -386,6 +390,18 @@ impl Parser {
         self.consume(TokenType::RightParen ,"Expect ')' after 'while'.".to_string())?;
 
         Ok(Stmt::While { condition, body: Box::new(self.statement()?) })
+    }
+
+    fn return_statement(&mut self) -> ParseResult<Stmt> {
+        let keyword = self.previous().clone();
+        let mut value: Option<Expr> = None;
+
+        if !self.check(TokenType::Semicolon) {
+            value = Some(self.expression()?);
+        }
+        
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.".to_string())?;
+        Ok(Stmt::Return { keyword, value })
     }
 
     fn function(&mut self, kind: &str) -> ParseResult<Stmt> {

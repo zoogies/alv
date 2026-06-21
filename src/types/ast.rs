@@ -40,6 +40,10 @@ pub enum Expr {
 pub enum Stmt {
     Expression(Box<Expr>),
     Print(Box<Expr>),
+    Return{
+        keyword: Token,
+        value: Option<Expr>
+    },
     Var{
         name: Token,
         initializer: Option<Box<Expr>>
