@@ -1,4 +1,4 @@
-use alv::frontend::{lexer, parser::Parser};
+use alv::frontend::{lexer, parser::Parser, resolver::Resolver};
 use alv::backend::treewalk::TWInterp;
 
 use alv::{alv_error, alv_log};
@@ -54,8 +54,9 @@ fn main() -> ExitCode {
         }
     }
 
-    match Parser::new(tokens).parse() {
-        Ok(e) => {
+    let mut p = Parser::new(tokens);
+    match p.parse() {
+        Ok(e) => {            
             if cli.print_ast {
                 println!("\n");
                 alv_log!("-------------   Parser Output    -------------");
@@ -65,9 +66,19 @@ fn main() -> ExitCode {
             println!("\n");
             alv_log!("------------- Interpreter Output -------------");
             
-            // TODO: should exit with code 70 if runtime error occurred
             let mut i = TWInterp::new();
-            i.interpret(&e)
+            
+            let mut r = Resolver::new(&mut i);
+            if r.resolve(&e) {
+                std::process::exit(65);
+            }
+            
+            // exit with code 70 if runtime error occurred, per bob
+            if i.interpret(&e) != ExitCode::SUCCESS {
+                std::process::exit(70);
+            }
+
+            ExitCode::SUCCESS
         },
         Err(_e) => {
             std::process::exit(65);

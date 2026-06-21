@@ -16,7 +16,8 @@ use std::{cell::RefCell, collections::HashMap, process::ExitCode, rc::Rc};
 #[derive(Default)]
 pub struct TWInterp {
     environment: Rc<RefCell<Environment>>,
-    globals: Rc<RefCell<Environment>>
+    globals: Rc<RefCell<Environment>>,
+    locals: HashMap<usize, usize>
 }
 
 impl TWInterp {
@@ -26,8 +27,8 @@ impl TWInterp {
             Expr::Grouping { expression } => self.evaluate(expression),
             Expr::Unary { operator, right } => self.eval_unary(operator, right),
             Expr::Binary { left, operator, right } => self.eval_binary(left, operator, right),
-            Expr::Variable { name } => self.eval_variable(name),
-            Expr::Assign { name, value } => self.eval_assign(name, value),
+            Expr::Variable { name, id } => self.lookup_variable(name, *id),
+            Expr::Assign { name, value, id } => self.eval_assign(name, value, *id),
             Expr::Logical { left, operator, right } => self.eval_logical(left, operator, right),
             Expr::Call { callee, paren, args } => self.eval_call(callee, paren.clone(), args),
         }
@@ -134,15 +135,16 @@ impl TWInterp {
         }
     }
 
-    fn eval_assign(&mut self, name: &Token, value: &Expr) -> Result<Value, RuntimeError> {
+    fn eval_assign(&mut self, name: &Token, value: &Expr, id: usize) -> Result<Value, RuntimeError> {
         let value = self.evaluate(value)?;
         
-        if self.environment.borrow_mut().assign(&name.lexeme, value.clone()) {
-            Ok(value)
-        }
-        else {
-            Err(RuntimeError {message: "Undefined variable TODO INSERT LEXEME NAME".to_string(), line: name.line}) // TODO: DO THIS YOU THUG <- don't call me that.
-        }
+        if let Some(dist) = self.locals.get(&id) {
+            self.environment.borrow_mut().assign_at(*dist, &name.lexeme, value.clone());
+        } else {
+            self.globals.borrow_mut().assign(&name.lexeme, value.clone());
+        };
+
+        Ok(value)
     }
 
     fn eval_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
@@ -334,13 +336,35 @@ impl TWInterp {
     pub fn new() -> Self {
         let mut s = Self {
             environment: Rc::new(RefCell::new(Environment::default())),
-            globals: Rc::new(RefCell::new(Environment::default()))
+            globals: Rc::new(RefCell::new(Environment::default())),
+            locals: HashMap::default()
         };
         s.environment = Rc::clone(&s.globals);
 
         register_natives(&mut s.globals.borrow_mut());
 
         s
+    }
+
+    // RESOLVER
+
+    pub fn resolve(&mut self, id: usize, depth: usize) {
+        self.locals.insert(id, depth);
+    }
+
+    fn lookup_variable(&self, name: &Token, id: usize) -> Result<Value, RuntimeError> {
+        let found = if let Some(dist) = self.locals.get(&id) {
+            self.environment.borrow().get_at(*dist, &name.lexeme)
+        } else {
+            self.globals.borrow().get(&name.lexeme)
+        };
+
+        if let Some(found) = found {
+            return Ok(found);
+        } else {
+            return Err(RuntimeError{message: format!("lookup_variable failed for variable: '{}'", name.lexeme), line: name.line})
+            // TODO: not the most accurate error message? I'm spitballing here
+        }
     }
 
 }

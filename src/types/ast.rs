@@ -1,10 +1,14 @@
 use super::token::{Token, Literal};
 
+use crate::util::log::*;
+use crate::types::token::*;
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Assign {
         name: Token,
-        value: Box<Expr>
+        value: Box<Expr>,
+        id: usize // used by resolver
     },
     Binary {
         left: Box<Expr>,
@@ -32,7 +36,8 @@ pub enum Expr {
         right: Box<Expr>
     },
     Variable {
-        name: Token
+        name: Token,
+        id: usize // used by resolver
     }
 }
 
@@ -64,5 +69,26 @@ pub enum Stmt {
         name: Token,
         params: Vec<Token>,
         body: Vec<Stmt>
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    pub token: Token,
+    pub message: String,
+}
+
+pub type ParseResult<T> = Result<T, ParseError>;
+
+pub fn parse_error(token: &Token, msg: String) -> ParseError {
+    if token.token_type == TokenType::EndFile {
+        alv_error!("[line {}] at end: {}", token.line + 1, msg);
+    } else {
+        alv_error!("[line {}] at '{}': {}", token.line + 1, token.lexeme, msg);
+    }
+
+    ParseError {
+        token: token.clone(),
+        message: msg,
     }
 }

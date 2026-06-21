@@ -5,21 +5,15 @@ use crate::util::log::*;
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    id_counter: usize
 }
-
-#[derive(Debug, Clone)]
-pub struct ParseError {
-    pub token: Token,
-    pub message: String,
-}
-
-type ParseResult<T> = Result<T, ParseError>;
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             tokens: tokens,
             current: 0,
+            id_counter: 0
         }
     }
 
@@ -33,13 +27,13 @@ impl Parser {
             let value = self.assignment()?;
 
             match expr {
-                Expr::Variable { name } => {
+                Expr::Variable { name , id } => {
                     return Ok(
-                        Expr::Assign { name, value: Box::new(value) }
+                        Expr::Assign { name, value: Box::new(value), id }
                     );
                 }
                 _ => {
-                    return Err(self.error(&equals, "Invalid assignment target.".to_string()));
+                    return Err(parse_error(&equals, "Invalid assignment target.".to_string()));
                 }
             }
         }
@@ -183,7 +177,7 @@ impl Parser {
         if !self.check(TokenType::RightParen) {
             loop {
                 if arguments.len() >= 255 {
-                    return Err(self.error(self.peek(), "Can't have more than 255 arguments.".to_string()));
+                    return Err(parse_error(self.peek(), "Can't have more than 255 arguments.".to_string()));
                 }
 
                 arguments.push(self.expression()?);
@@ -226,31 +220,19 @@ impl Parser {
         }
 
         if self.match_token(&[TokenType::Identifier]) {
-            return Ok(Expr::Variable { name: self.previous().clone() })
+            self.id_counter += 1;
+            return Ok(Expr::Variable { name: self.previous().clone(), id: self.id_counter - 1 })
         }
 
-        Err(self.error(self.peek(), "Expect expression.".to_string()))
+        Err(parse_error(self.peek(), "Expect expression.".to_string()))
     }
 
     // ------------ error recovery ------------
 
-    fn error(&self, token: &Token, msg: String) -> ParseError {
-        if token.token_type == TokenType::EndFile {
-            alv_error!("[line {}] at end: {}", token.line + 1, msg);
-        } else {
-            alv_error!("[line {}] at '{}': {}", token.line + 1, token.lexeme, msg);
-        }
-
-        ParseError {
-            token: token.clone(),
-            message: msg,
-        }
-    }
-
     fn consume(&mut self, ty: TokenType, msg: String) -> Result<&Token, ParseError> {
         if self.check(ty) { return Ok(self.advance()); }
 
-        Err(self.error(self.peek(), msg))
+        Err(parse_error(self.peek(), msg))
     }
 
     // ------------ token ops ------------
@@ -412,7 +394,7 @@ impl Parser {
         if !self.check(TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
-                    return Err(self.error(&name,"Can't have more than 255 parameters.".to_string()));
+                    return Err(parse_error(&name,"Can't have more than 255 parameters.".to_string()));
                 }
 
                 parameters.push(
