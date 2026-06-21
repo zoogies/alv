@@ -1,64 +1,17 @@
-use crate::{lexer::*, log::{alv_error, alv_log}, parser::*, treewalk::Function::{LoxFunction, NativeFunction}};
-use std::time::{SystemTime, UNIX_EPOCH};
+mod environment;
+mod natives;
+mod values;
 
-use std::{cell::RefCell, collections::HashMap, default, process::ExitCode, rc::Rc};
+use crate::types::token::*;
+use crate::types::ast::*;
 
-#[derive(Debug, Clone)]
-enum Function {
-    NativeFunction{arity: usize, imp: fn(&mut TWInterp, &[Value]) -> Result<Value, RuntimeError>},
-    LoxFunction{name: Token, params: Vec<Token>, body: Vec<Stmt>}
-}
+use crate::util::log::*;
 
-// currently shadows literal, but with global strings
-#[derive(Debug, Clone)]
-pub enum Value {
-    String(String), // heap strings for runtime?
-    Number(f64),
-    Boolean(bool),
-    Nil,
-    Function(Function)
-}
+use self::values::*;
+use self::environment::*;
+use self::natives::register_natives;
 
-// needs new lifetime specifier later if you add AST/token slices
-pub struct RuntimeError {
-    pub message: String,
-    pub line: usize
-}
-
-#[derive(Default)]
-pub struct Environment {
-    environment: HashMap<String,Value>,
-    enclosing: Option<Rc<RefCell<Environment>>>
-}
-
-impl Environment {
-    pub fn get(&self, k: &str) -> Option<Value> {
-        match self.environment.get(k) {
-            Some(v) => Some(v.clone()),
-            None => match &self.enclosing {
-                Some(parent) => parent.borrow().get(k),
-                None => None
-            }
-        }
-    }
-
-    pub fn define(&mut self, k: String, v: Value) {
-        self.environment.insert(k, v);
-    }
-
-    pub fn assign(&mut self, k: &str, v: Value) -> bool {
-        if self.environment.contains_key(k) {
-            self.environment.insert(k.to_string(), v);
-            true
-        }
-        else {
-            match &self.enclosing {
-                Some(parent) => parent.borrow_mut().assign(k, v),
-                None => false,
-            }
-        }
-    }
-}
+use std::{cell::RefCell, collections::HashMap, process::ExitCode, rc::Rc};
 
 #[derive(Default)]
 pub struct TWInterp {
@@ -238,10 +191,10 @@ impl TWInterp {
         };
 
         match f {
-            NativeFunction { arity, imp } => {
+            Function::NativeFunction { imp, .. } => {
                 Ok(imp(self, args)?)
             },
-            LoxFunction { name, params, body } => {
+            Function::LoxFunction { params, body, .. } => {
                 let e = Rc::new(RefCell::new(
                     Environment {
                         enclosing: Some(Rc::clone(&self.globals)),
@@ -260,29 +213,6 @@ impl TWInterp {
         }
     }
 
-    fn stringify(&self, value: &Value) -> String {
-        match value {
-            Value::String(s) => {
-                s.clone()
-            },
-            Value::Boolean(b) => {
-                b.to_string()
-            },
-            Value::Number(n) => {
-                n.to_string()
-            }
-            Value::Nil => {
-                "Nil".to_string()
-            },
-            Value::Function(f) => {
-                match f {
-                    NativeFunction { .. } => { "<NATIVE FUNCTION>".to_string() },
-                    LoxFunction { name, .. } => { format!("<Fn {}>", name.lexeme) }
-                }
-            }
-        }
-    }
-
     fn execute_block(&mut self, blocks: &Vec<Stmt>, env: Rc<RefCell<Environment>>) -> Result<(), RuntimeError> {
         let prev = Rc::clone(&self.environment);
         self.environment = env;
@@ -296,7 +226,7 @@ impl TWInterp {
         match stmt {
             Stmt::PrintStmt(pstmt) => {
                 let v: Value = self.evaluate(&*pstmt)?;
-                alv_log!("{}",self.stringify(&v));
+                alv_log!("{}",alv_stringify(&v));
                 Ok(())
             },
             Stmt::ExpressionStmt(estmt) => {
@@ -380,16 +310,4 @@ impl TWInterp {
         s
     }
 
-}
-
-// NATIVE FUNCTIONS
-
-fn register_natives(env: &mut Environment) {
-    env.define("clock".to_string(), Value::Function(Function::NativeFunction { arity: 0, imp: clock }));
-}
-
-fn clock(_interp: &mut TWInterp, _args: &[Value]) -> Result<Value, RuntimeError> {
-    Ok(
-        Value::Number(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs() as f64)
-    )
 }

@@ -1,42 +1,6 @@
-use std::fmt::Error;
-
-use crate::{lexer::{TokenType::Semicolon, *}, log::alv_error, parser::{Expr::Assign, Stmt::{ExpressionStmt, PrintStmt}}};
-
-#[derive(Debug, Clone)]
-pub enum Expr {
-    Assign {
-        name: Token,
-        value: Box<Expr>
-    },
-    Binary {
-        left: Box<Expr>,
-        operator: Token,
-        right: Box<Expr>
-    },
-    Call {
-        callee: Box<Expr>,
-        paren: Token,
-        args: Vec<Expr>
-    },
-    Grouping {
-        expression: Box<Expr>
-    },
-    Literal {
-        value: Literal
-    },
-    Logical {
-        left: Box<Expr>,
-        operator: Token,
-        right: Box<Expr>,
-    },
-    Unary {
-        operator: Token,
-        right: Box<Expr>
-    },
-    Variable {
-        name: Token
-    }
-}
+use crate::types::token::*;
+use crate::types::ast::*;
+use crate::util::log::*;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -50,21 +14,6 @@ pub struct ParseError {
 }
 
 type ParseResult<T> = Result<T, ParseError>;
-
-#[derive(Debug, Clone)]
-pub enum Stmt {
-    ExpressionStmt(Box<Expr>),
-    PrintStmt(Box<Expr>),
-    VarStmt{name: Token, initializer: Option<Box<Expr>>},
-    BlockStmt{statements: Vec<Stmt>},
-    IfStmt{condition: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>> },
-    WhileStmt{condition: Expr, body: Box<Stmt>},
-    Function {
-        name: Token,
-        params: Vec<Token>,
-        body: Vec<Stmt>
-    }
-}
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
@@ -401,7 +350,7 @@ impl Parser {
     fn print_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
-        Ok(PrintStmt(Box::new(expr)))
+        Ok(Stmt::PrintStmt(Box::new(expr)))
     }
 
     fn block_statement(&mut self) -> ParseResult<Vec<Stmt>> {
@@ -513,7 +462,7 @@ impl Parser {
     fn expression_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.".to_string())?;
-        Ok(ExpressionStmt(Box::new(expr)))
+        Ok(Stmt::ExpressionStmt(Box::new(expr)))
     }
 
     fn synchronize(&mut self) {

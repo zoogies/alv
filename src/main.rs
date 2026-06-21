@@ -1,21 +1,10 @@
-mod lexer;
-mod log;
-mod parser;
-mod treewalk;
+use alv::frontend::{lexer, parser::Parser};
+use alv::backend::treewalk::TWInterp;
+
+use alv::{alv_error, alv_log};
 
 use std::env;
 use std::process::ExitCode;
-
-use crate::log::alv_error;
-use crate::log::alv_log;
-use crate::treewalk::TWInterp;
-
-use lexer::Literal;
-use lexer::Token;
-use lexer::TokenType;
-
-use parser::Parser;
-use parser::Expr;
 
 fn print_usage() {
     println!("usage: alv <input file>.alv");

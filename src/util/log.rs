@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! alv_log {
     ($($args:tt)*) => {
         print!("[INFO] "); 
@@ -5,6 +6,7 @@ macro_rules! alv_log {
     };
 }
 
+#[macro_export]
 macro_rules! alv_error {
     ($($args:tt)*) => {
         print!("[ERROR] "); 
