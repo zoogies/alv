@@ -16,6 +16,21 @@ pub enum Function {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Class {
+    name: String
+}
+
+impl Class {
+    pub fn new(name: &str) -> Self {
+        Self { name: name.to_string() }
+    }
+
+    pub fn to_string(&self) -> &str {
+        &self.name
+    }
+}
+
 // currently shadows literal, but with global strings
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -23,7 +38,8 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Nil,
-    Function(Function)
+    Function(Function),
+    Class(Class)
 }
 
 pub enum Interrupt {
@@ -64,6 +80,9 @@ pub fn alv_stringify(value: &Value) -> String {
                     Function::NativeFunction { .. } => { "<NATIVE FUNCTION>".to_string() },
                     Function::LoxFunction { name, .. } => { format!("<Fn {}>", name.lexeme) }
                 }
+            },
+            Value::Class(c) => {
+                c.to_string().to_string() // lol
             }
         }
     }

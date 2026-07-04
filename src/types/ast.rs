@@ -69,6 +69,10 @@ pub enum Stmt {
         name: Token,
         params: Vec<Token>,
         body: Vec<Stmt>
+    },
+    Class {
+        name: Token,
+        methods: Vec<Stmt> // Stmt::Function
     }
 }
 

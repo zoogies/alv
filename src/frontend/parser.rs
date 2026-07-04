@@ -203,6 +203,20 @@ impl Parser {
         Ok(Stmt::Var { name: name, initializer: initializer })
     }
 
+    fn class_declaration(&mut self) -> ParseResult<Stmt> {
+        let name = self.consume(TokenType::Identifier, "Expected class name.".to_string())?.clone();
+        self.consume(TokenType::LeftBrace, "Expect '{' before class body.".to_string())?;
+
+        let mut methods = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after class body.".to_string())?;
+
+        Ok(Stmt::Class { name, methods })
+    }
+
     fn primary(&mut self) -> ParseResult<Expr> {
         if self.match_token(&[TokenType::False]) { return Ok(Expr::Literal { value: Literal::Bool(false) }); }
         if self.match_token(&[TokenType::True])  { return Ok(Expr::Literal { value: Literal::Bool(true)  }); }
@@ -298,6 +312,11 @@ impl Parser {
         if self.match_token(&[TokenType::Fun]) {
             return self.function("function");
         }
+
+        if self.match_token(&[TokenType::Class]) {
+            return self.class_declaration();
+        }
+
         if self.match_token(&[TokenType::Var]) {
             return self.var_declaration();
         }

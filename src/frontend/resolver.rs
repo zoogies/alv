@@ -112,6 +112,10 @@ impl<'t> Resolver<'t> {
             Stmt::While { condition, body } => {
                 self.resolve_stmt(body);
                 self.resolve_expr(condition);
+            },
+            Stmt::Class { name, methods: _ } => {
+                self.declare(name);
+                self.define(name);
             }
         }
     }

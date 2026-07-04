@@ -299,6 +299,11 @@ impl TWInterp {
                         Err(Interrupt::Return{keyword: keyword.clone(), value: Some(self.evaluate(&v)?)})
                     }
                 }
+            },
+            Stmt::Class { name, methods: _ } => {
+                self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
+                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme)));
+                Ok(())
             }
         }
     }
