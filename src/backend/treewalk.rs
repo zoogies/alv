@@ -31,6 +31,8 @@ impl TWInterp {
             Expr::Assign { name, value, id } => self.eval_assign(name, value, *id),
             Expr::Logical { left, operator, right } => self.eval_logical(left, operator, right),
             Expr::Call { callee, paren, args } => self.eval_call(callee, paren.clone(), args),
+            Expr::Get { object, name } => self.eval_get(object, name.clone()),
+            Expr::Set { object, value, name } => self.eval_set(object, value, name.clone()),
         }
     }
 
@@ -73,6 +75,7 @@ impl TWInterp {
             (Value::Number(x), Value::Number(y)) => x == y,
             (Value::String(x), Value::String(y)) => x == y,
             (Value::Boolean(x), Value::Boolean(y)) => x == y,
+            (Value::Instance(x), Value::Instance(y)) => x.equals(y),
             _ => false
         }
     }
@@ -151,6 +154,26 @@ impl TWInterp {
         }
 
         self.evaluate(right)
+    }
+
+    fn eval_get(&mut self, object: &Box<Expr>, name: Token) -> Result<Value, RuntimeError> {
+        match self.evaluate(&object)? {
+            Value::Instance(i) => {
+                i.get(&name)
+            }
+            _ => { Err(RuntimeError{message: "Only instances have properties.".to_string(), line: name.line}) }
+        }
+    }
+
+    fn eval_set(&mut self, object: &Box<Expr>, value: &Box<Expr>, name: Token) -> Result<Value, RuntimeError> {
+        match self.evaluate(&object)? {
+            Value::Instance(i) => {
+                let value = self.evaluate(value)?;
+                i.set(&name, &value);
+                Ok(value)
+            }
+            _ => { Err(RuntimeError{message: "Only instances have fields.".to_string(), line: name.line}) }
+        }        
     }
 
     fn eval_call(&mut self, callee: &Box<Expr>, paren: Token, arguments: &Vec<Expr> ) -> Result<Value, RuntimeError> {

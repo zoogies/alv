@@ -3,7 +3,7 @@ use crate::types::ast::Stmt;
 use super::TWInterp;
 use crate::backend::treewalk::environment::Environment;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -33,12 +33,13 @@ impl Class {
 
 #[derive(Debug, Clone)]
 pub struct Instance {
-    parent: Rc<Class>
+    parent: Rc<Class>,
+    fields: Rc<RefCell<HashMap<String, Value>>>
 }
 
 impl Instance {
     pub fn new(class: Class) -> Self {
-        Self { parent: Rc::new(class) }
+        Self { parent: Rc::new(class), fields: Rc::new(RefCell::new(HashMap::new())) }
     }
 
     pub fn to_string(&self) -> String {
@@ -49,9 +50,25 @@ impl Instance {
 
     // }
 
+    pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
+        if self.fields.borrow().contains_key(&name.lexeme) {
+            return Ok(self.fields.borrow().get(&name.lexeme).unwrap().clone());
+        }
+        Err(RuntimeError { message: format!("Undefined property '{}'.", &name.lexeme), line: name.line })
+    }
+
+    pub fn set(&self, name: &Token, value: &Value) {
+        self.fields.borrow_mut().insert(name.lexeme.clone(), value.clone());
+    }
+
     pub fn arity(&self) -> usize {
         0
     }
+
+    pub fn equals(&self, other: &Instance) -> bool {
+        Rc::ptr_eq(&self.fields, &other.fields)
+    }
+
 }
 
 // currently shadows literal, but with global strings

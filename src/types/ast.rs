@@ -23,6 +23,15 @@ pub enum Expr {
     Grouping {
         expression: Box<Expr>
     },
+    Get {
+        object: Box<Expr>,
+        name: Token
+    },
+    Set {
+        object: Box<Expr>,
+        value: Box<Expr>,
+        name: Token
+    },
     Literal {
         value: Literal
     },

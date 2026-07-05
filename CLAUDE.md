@@ -15,6 +15,12 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
 - Keep replies cohesive and textbook-like: do the reasoning and weighing of options in your
   head, then present the boiled-down, clear explanation. Push genuine nuance or alternative
   paths into brief footnotes rather than threading them through the main answer.
+- **Default to pointed, concise answers.** He'll explicitly ask when he wants a longer or more
+  comprehensive treatment. Bias toward the tight answer that removes ambiguity over the
+  comprehensive one that reintroduces it by being sprawling or vague. Retain agency to go long
+  when it's genuinely warranted — especially while he's still in an exploratory/design phase on
+  a question — but treat that as the exception, not the default. When he asks for "just a simple
+  acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
 - Be proactive about recording his preferences here in CLAUDE.md as they come up, without
   waiting to be asked each time.
 - A recurring theme worth reusing: many Java design patterns in the book (Visitor, etc.) exist

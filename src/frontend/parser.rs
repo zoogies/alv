@@ -30,6 +30,11 @@ impl Parser {
                     return Ok(
                         Expr::Assign { name, value: Box::new(value), id }
                     );
+                },
+                Expr::Get { object, name } => {
+                    return Ok(
+                        Expr::Set { object: object, name, value: Box::new(value) }
+                    )
                 }
                 _ => {
                     return Err(parse_error(&equals, "Invalid assignment target.".to_string()));
@@ -162,6 +167,15 @@ impl Parser {
         loop {
             if self.match_token(&[TokenType::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            }
+            else if self.match_token(&[TokenType::Dot]) {
+                expr = Expr::Get{
+                    object: Box::new(expr),
+                    name: self.consume(
+                        TokenType::Identifier,
+                        "Expect property name after '.'.".to_string()
+                    )?.clone()
+                }
             }
             else {
                 break;

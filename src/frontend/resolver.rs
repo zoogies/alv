@@ -163,7 +163,14 @@ impl<'t> Resolver<'t> {
             Expr::Unary { right, .. } => {
                 self.resolve_expr(right);
             }
-            Expr::Literal { .. } => {}
+            Expr::Literal { .. } => {},
+            Expr::Get { object, .. } => {
+                self.resolve_expr(object);
+            },
+            Expr::Set { object, value, .. } => {
+                self.resolve_expr(object);
+                self.resolve_expr(value);
+            }
         }
     }
 
