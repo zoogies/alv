@@ -320,9 +320,25 @@ impl TWInterp {
                     }
                 }
             },
-            Stmt::Class { name, methods: _ } => {
+            Stmt::Class { name, methods } => {
                 self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
-                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme)));
+
+                let mut meths: HashMap<String, Function> = HashMap::new();
+                for method in methods {
+                    if let Stmt::Function { name: mname, params, body } = method {
+                        meths.insert(
+                            mname.lexeme.clone(),
+                            Function::LoxFunction {
+                                name: mname.clone(),
+                                params: params.clone(),
+                                body: body.clone(),
+                                closure: Rc::clone(&self.environment)
+                            }
+                        );
+                    }
+                }
+
+                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme, meths)));
                 Ok(())
             }
         }

@@ -18,16 +18,21 @@ pub enum Function {
 
 #[derive(Debug, Clone)]
 pub struct Class {
-    pub name: String
+    pub name: String,
+    pub methods: HashMap<String, Function>
 }
 
 impl Class {
-    pub fn new(name: &str) -> Self {
-        Self { name: name.to_string() }
+    pub fn new(name: &str, methods: HashMap<String, Function>) -> Self {
+        Self { name: name.to_string(), methods }
     }
 
     pub fn to_string(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<&Function> {
+        self.methods.get(name)
     }
 }
 
@@ -51,9 +56,14 @@ impl Instance {
     // }
 
     pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
-        if self.fields.borrow().contains_key(&name.lexeme) {
-            return Ok(self.fields.borrow().get(&name.lexeme).unwrap().clone());
+        if let Some(v) = self.fields.borrow().get(&name.lexeme) {
+            return Ok(v.clone());
         }
+
+        if let Some(meth) = self.parent.find_method(&name.lexeme) {
+            return Ok(Value::Function(meth.clone()))
+        }
+
         Err(RuntimeError { message: format!("Undefined property '{}'.", &name.lexeme), line: name.line })
     }
 

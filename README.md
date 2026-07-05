@@ -13,3 +13,7 @@ example:
 ```bash
 cargo r tests/10.4.lox 
 ```
+
+### TODO
+
+Change Stmt::Function body into it's on struct such that we don't have to destructure with `if let` at every site.

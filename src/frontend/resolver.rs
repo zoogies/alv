@@ -8,7 +8,8 @@ use std::{collections::HashMap};
 #[derive(Clone, PartialEq)]
 enum FunctionType {
     NONE,
-    FUNCTION
+    FUNCTION,
+    METHOD
 }
 
 pub struct Resolver<'t> {
@@ -113,9 +114,15 @@ impl<'t> Resolver<'t> {
                 self.resolve_stmt(body);
                 self.resolve_expr(condition);
             },
-            Stmt::Class { name, methods: _ } => {
+            Stmt::Class { name, methods } => {
                 self.declare(name);
                 self.define(name);
+
+                for method in methods {
+                    if let Stmt::Function { params, body, .. } = method {
+                        self.resolve_function(params, body, FunctionType::METHOD);
+                    }
+                }
             }
         }
     }

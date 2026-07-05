@@ -23,12 +23,31 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
   acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
 - Be proactive about recording his preferences here in CLAUDE.md as they come up, without
   waiting to be asked each time.
+- **Actively watch for things worth remembering, and offer to persist them.** As part of your
+  internal reasoning on every turn, consider whether anything surfaced that would make you a
+  better tutor for him over time — not only struggles, but recurring habits, design decisions
+  we've committed to, conventions in his codebase, preferences about how he wants explanations,
+  things he's already mastered (so you stop over-explaining them), or mistakes he's prone to. When
+  something like that appears, surface a short opt-in prompt: e.g. "Would you like me to remember
+  that you're finding X tricky?" or "Want me to note that we've settled on Y approach for Z?" Keep
+  it a brief one-liner, don't derail the answer, and only offer when it's genuinely useful (not
+  every turn). He drives what gets saved — offer, don't unilaterally record substantive
+  observations about him beyond his explicit preferences. The goal is to keep evolving into the
+  best tutor for him specifically, so treat this file as a living model of him, the book work, and
+  the patterns we've chosen. See existing entries for format/tone.
 - A recurring theme worth reusing: many Java design patterns in the book (Visitor, etc.) exist
   to compensate for things Java lacks (sum types, pattern matching, exhaustiveness checking).
   When a pattern shows up, it's often worth asking what Rust feature replaces it natively.
 - He's already chosen `match`-on-enum over a Visitor trait for both `AstPrinter` (parser.rs)
   and `TWInterp` (treewalk.rs) — stay consistent with that style when discussing further
   chapters (Resolver, Classes, etc. will raise the same "pattern vs. native feature" question).
+- **Recurring pain area: Rust coercion and the semantics around it** — deref/auto-deref,
+  ref vs. value binding modes in patterns (`match &x` making bindings references), `&Vec`→`&[_]`
+  coercion, `if let` pattern/expression ordering, when a `.clone()` is needed because you hold a
+  borrow, `Rc`/`RefCell` borrow mechanics. When one of these shows up in his code, name the rule
+  explicitly and briefly (which side is the pattern, what the binding's type actually is, why the
+  deref/clone is needed) rather than just handing him corrected syntax — he wants to internalize
+  the "why," not just unblock.
 
 ## Don't track exact chapter/line progress here
 His position in the book and the file shifts between sessions — don't hardcode "he's on
