@@ -161,30 +161,27 @@ impl TWInterp {
             args.push(self.evaluate(&argument)?);
         }
 
-
-        let Value::Function(f) = &callee else {
-            return Err(RuntimeError{message: "Can only call functions and classes.".to_string(), line:paren.line});
-        };
-
-        let arity = match f {
-            Function::LoxFunction { params, ..} => {params.len()},
-            Function::NativeFunction { arity: ar, imp: _imp } => {*ar}
+        let arity = match &callee {
+            Value::Function(Function::LoxFunction { params, .. }) => { params.len() },
+            Value::Function(Function::NativeFunction { arity, .. }) => { *arity },
+            Value::Class(..) => { 0 } // TODO: changes with constructors
+            _ => { return Err(RuntimeError{message: "Can only call functions and classes.".to_string(), line:paren.line}); }
         };
 
         if args.len() != arity {
             return Err(RuntimeError{message: format!("Expected {} arguments but got {}.", arity, args.len()), line:paren.line});
         }
 
-        Ok(self.call_function(&callee, &args)?)
+        match callee {
+            Value::Function(f) => Ok(self.call_function(&f, &args)?),
+            Value::Class(c) => {
+                return Ok(Value::Instance(Instance::new(c)))
+            },
+            _ => unreachable!()
+        }
     }
 
-    fn call_function(&mut self, f: &Value, args: &Vec<Value>) -> Result<Value, RuntimeError> {
-        let f = match f {
-            Value::Function(f) => {f},
-            _ => { return Err(RuntimeError{message: "Cannot call_function on non-function Value.".to_string(), line: 0}); }
-            // ^^ HOW TF DO I GET A LINE NUMBER HERE? DO I CARE? TODO
-        };
-
+    fn call_function(&mut self, f: &Function, args: &Vec<Value>) -> Result<Value, RuntimeError> {
         match f {
             Function::NativeFunction { imp, .. } => {
                 Ok(imp(self, args)?)

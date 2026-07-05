@@ -18,7 +18,7 @@ pub enum Function {
 
 #[derive(Debug, Clone)]
 pub struct Class {
-    name: String
+    pub name: String
 }
 
 impl Class {
@@ -26,20 +26,44 @@ impl Class {
         Self { name: name.to_string() }
     }
 
-    pub fn to_string(&self) -> &str {
-        &self.name
+    pub fn to_string(&self) -> String {
+        self.name.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Instance {
+    parent: Rc<Class>
+}
+
+impl Instance {
+    pub fn new(class: Class) -> Self {
+        Self { parent: Rc::new(class) }
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("{} Instance", &self.parent.to_string())
+    }
+
+    // pub fn call(&self, interp: &TWInterp, args: Vec<Value>) -> Value {
+
+    // }
+
+    pub fn arity(&self) -> usize {
+        0
     }
 }
 
 // currently shadows literal, but with global strings
 #[derive(Debug, Clone)]
 pub enum Value {
-    String(String), // heap strings for runtime?
+    String(String),
     Number(f64),
     Boolean(bool),
     Nil,
     Function(Function),
-    Class(Class)
+    Class(Class),
+    Instance(Instance)
 }
 
 pub enum Interrupt {
@@ -82,7 +106,10 @@ pub fn alv_stringify(value: &Value) -> String {
                 }
             },
             Value::Class(c) => {
-                c.to_string().to_string() // lol
+                c.to_string()
+            },
+            Value::Instance(i) => {
+                i.to_string()
             }
         }
     }
