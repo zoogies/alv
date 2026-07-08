@@ -1,4 +1,4 @@
-use crate::types::token::Token;
+use crate::{backend::treewalk::values::Function::LoxFunction, types::token::Token};
 use crate::types::ast::Stmt;
 use super::TWInterp;
 use crate::backend::treewalk::environment::Environment;
@@ -13,6 +13,26 @@ pub enum Function {
         params: Vec<Token>,
         body: Vec<Stmt>,
         closure: Rc<RefCell<Environment>>
+    }
+}
+
+impl Function {
+    fn bind(&mut self, inst: &Instance, line: usize) -> Result<Self, RuntimeError> {
+        match self {
+            LoxFunction { name, params, body, closure } => {
+                let e = Rc::new(RefCell::new(Environment {
+                    enclosing: Some(Rc::clone(closure)),
+                    environment: HashMap::new()
+                }));
+
+                e.borrow_mut().define("this".to_string(), Value::Instance(inst.clone()));
+
+                Ok(Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: e })
+            },
+            _ => {
+                Err(RuntimeError { message: format!("Tried binding to non-lox function!"), line: line })
+            }
+        }
     }
 }
 
@@ -51,17 +71,13 @@ impl Instance {
         format!("{} Instance", &self.parent.to_string())
     }
 
-    // pub fn call(&self, interp: &TWInterp, args: Vec<Value>) -> Value {
-
-    // }
-
     pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
         if let Some(v) = self.fields.borrow().get(&name.lexeme) {
             return Ok(v.clone());
         }
 
         if let Some(meth) = self.parent.find_method(&name.lexeme) {
-            return Ok(Value::Function(meth.clone()))
+            return Ok(Value::Function(meth.clone().bind(&self.clone(), name.line)?))
         }
 
         Err(RuntimeError { message: format!("Undefined property '{}'.", &name.lexeme), line: name.line })

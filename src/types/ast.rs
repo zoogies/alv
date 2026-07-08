@@ -32,6 +32,10 @@ pub enum Expr {
         value: Box<Expr>,
         name: Token
     },
+    This {
+        keyword: Token,
+        id: usize // used by resolver
+    },
     Literal {
         value: Literal
     },

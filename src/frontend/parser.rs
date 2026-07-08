@@ -235,6 +235,11 @@ impl Parser {
         if self.match_token(&[TokenType::False]) { return Ok(Expr::Literal { value: Literal::Bool(false) }); }
         if self.match_token(&[TokenType::True])  { return Ok(Expr::Literal { value: Literal::Bool(true)  }); }
         if self.match_token(&[TokenType::Nil])   { return Ok(Expr::Literal { value: Literal::Nil         }); }
+        
+        if self.match_token(&[TokenType::This]) {
+            self.id_counter += 1;
+            return Ok(Expr::This { keyword: self.previous().clone(), id: self.id_counter - 1 });
+        }
 
         if self.match_token(&[TokenType::Num, TokenType::Str]) {
             return Ok(Expr::Literal { value: self.previous().literal.clone().expect("Missing literal in parser.rs::primary()") });

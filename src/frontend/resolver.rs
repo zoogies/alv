@@ -118,11 +118,17 @@ impl<'t> Resolver<'t> {
                 self.declare(name);
                 self.define(name);
 
+                self.begin_scope();
+                let Some(scope) = self.scopes.last_mut() else {return;};
+                scope.insert("this".to_string(), true);
+
                 for method in methods {
                     if let Stmt::Function { params, body, .. } = method {
                         self.resolve_function(params, body, FunctionType::METHOD);
                     }
                 }
+
+                self.end_scope();
             }
         }
     }
@@ -177,6 +183,9 @@ impl<'t> Resolver<'t> {
             Expr::Set { object, value, .. } => {
                 self.resolve_expr(object);
                 self.resolve_expr(value);
+            },
+            Expr::This { id, keyword } => {
+                self.resolve_local(*id, keyword);
             }
         }
     }

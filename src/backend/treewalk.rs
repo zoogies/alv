@@ -33,6 +33,7 @@ impl TWInterp {
             Expr::Call { callee, paren, args } => self.eval_call(callee, paren.clone(), args),
             Expr::Get { object, name } => self.eval_get(object, name.clone()),
             Expr::Set { object, value, name } => self.eval_set(object, value, name.clone()),
+            Expr::This { keyword, id } => self.lookup_variable(keyword, *id),
         }
     }
 
