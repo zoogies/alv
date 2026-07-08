@@ -12,10 +12,17 @@ enum FunctionType {
     METHOD
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum ClassType {
+    NONE,
+    CLASS
+}
+
 pub struct Resolver<'t> {
     interpreter: &'t mut TWInterp,
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
     had_error: bool
 }
 
@@ -24,7 +31,7 @@ impl<'t> Resolver<'t> {
 
 
     pub fn new(interpreter: &'t mut TWInterp) -> Self {
-        Self { interpreter, scopes: Vec::default(), current_function: FunctionType::NONE, had_error: false }
+        Self { interpreter, scopes: Vec::default(), current_function: FunctionType::NONE, had_error: false, current_class: ClassType::NONE }
     }
 
     // -------------   SCOPING   --------------- 
@@ -115,6 +122,9 @@ impl<'t> Resolver<'t> {
                 self.resolve_expr(condition);
             },
             Stmt::Class { name, methods } => {
+                let enclosing_class: ClassType = self.current_class;
+                self.current_class = ClassType::CLASS;
+
                 self.declare(name);
                 self.define(name);
 
@@ -129,6 +139,8 @@ impl<'t> Resolver<'t> {
                 }
 
                 self.end_scope();
+
+                self.current_class = enclosing_class;
             }
         }
     }
@@ -185,6 +197,11 @@ impl<'t> Resolver<'t> {
                 self.resolve_expr(value);
             },
             Expr::This { id, keyword } => {
+                if self.current_class != ClassType::CLASS {
+                    alv_error!("[line {}] Can't use 'this' outside of a class.", keyword.line + 1);
+                    self.had_error = true;
+                }
+
                 self.resolve_local(*id, keyword);
             }
         }
