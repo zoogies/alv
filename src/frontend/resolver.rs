@@ -9,7 +9,8 @@ use std::{collections::HashMap};
 enum FunctionType {
     NONE,
     FUNCTION,
-    METHOD
+    METHOD,
+    INITIALIZER,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -115,7 +116,14 @@ impl<'t> Resolver<'t> {
                     alv_error!("Resolver Error: Can't return from top level code on line: {}", keyword.line + 1);
                 }
 
-                if let Some(value) = value { self.resolve_expr(value) };
+                if let Some(value) = value {
+                    if self.current_function == FunctionType::INITIALIZER {
+                        self.had_error = true;
+                        alv_error!("Resolver Error: Can't return from an initializer on line: {}", keyword.line + 1);
+                    }
+                
+                    self.resolve_expr(value)
+                };
             },
             Stmt::While { condition, body } => {
                 self.resolve_stmt(body);
@@ -133,8 +141,9 @@ impl<'t> Resolver<'t> {
                 scope.insert("this".to_string(), true);
 
                 for method in methods {
-                    if let Stmt::Function { params, body, .. } = method {
-                        self.resolve_function(params, body, FunctionType::METHOD);
+                    if let Stmt::Function { params, body, name: mname } = method {
+                        let ty = if mname.lexeme == "init" { FunctionType::INITIALIZER } else { FunctionType::METHOD };
+                        self.resolve_function(params, body, ty);
                     }
                 }
 

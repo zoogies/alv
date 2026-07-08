@@ -188,7 +188,7 @@ impl TWInterp {
         let arity = match &callee {
             Value::Function(Function::LoxFunction { params, .. }) => { params.len() },
             Value::Function(Function::NativeFunction { arity, .. }) => { *arity },
-            Value::Class(..) => { 0 } // TODO: changes with constructors
+            Value::Class(c) => { if let Some(Function::LoxFunction { params, .. }) = c.find_method("init") { params.len() } else { 0 } }
             _ => { return Err(RuntimeError{message: "Can only call functions and classes.".to_string(), line:paren.line}); }
         };
 
@@ -199,7 +199,15 @@ impl TWInterp {
         match callee {
             Value::Function(f) => Ok(self.call_function(&f, &args)?),
             Value::Class(c) => {
-                return Ok(Value::Instance(Instance::new(c)))
+                let v = Instance::new(Rc::new(c));
+
+                if let Some(initializer) = v.parent.find_method("init") {
+                    if let Ok(r) = initializer.bind(&v, paren.line) {                        
+                        self.call_function(&r, &args)?;
+                    };
+                };
+
+                return Ok(Value::Instance(v))
             },
             _ => unreachable!()
         }
@@ -210,7 +218,7 @@ impl TWInterp {
             Function::NativeFunction { imp, .. } => {
                 Ok(imp(self, args)?)
             },
-            Function::LoxFunction { params, body, closure, .. } => {
+            Function::LoxFunction { params, body, closure, is_initializer, .. } => {
                 let e = Rc::new(RefCell::new(
                     Environment {
                         enclosing: Some(Rc::clone(closure)),
@@ -223,6 +231,14 @@ impl TWInterp {
                 }
 
                 let r = self.execute_block(body, e);
+                if let Err(Interrupt::Error(err)) = r {
+                    return Err(err);
+                }
+
+                if *is_initializer && let Some(v) = closure.borrow().get_at(0, "this") {
+                    return Ok(v);
+                }
+
                 match r {
                     Ok(..) => {
                         Ok(Value::Nil)
@@ -237,6 +253,8 @@ impl TWInterp {
                             }
                         }
                     },
+
+                    // unreachable.
                     Err(Interrupt::Error(e)) => {
                         Err(e)
                     }
@@ -305,7 +323,7 @@ impl TWInterp {
                 self.environment.borrow_mut().define(
                     name.lexeme.clone(),
                     Value::Function(
-                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: Rc::clone(&self.environment) }
+                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: Rc::clone(&self.environment), is_initializer: false }
                     )
                 );
 
@@ -333,7 +351,8 @@ impl TWInterp {
                                 name: mname.clone(),
                                 params: params.clone(),
                                 body: body.clone(),
-                                closure: Rc::clone(&self.environment)
+                                closure: Rc::clone(&self.environment),
+                                is_initializer: mname.lexeme.eq("init")
                             }
                         );
                     }

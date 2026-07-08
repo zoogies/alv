@@ -12,14 +12,15 @@ pub enum Function {
         name: Token,
         params: Vec<Token>,
         body: Vec<Stmt>,
-        closure: Rc<RefCell<Environment>>
+        closure: Rc<RefCell<Environment>>,
+        is_initializer: bool,
     }
 }
 
 impl Function {
-    fn bind(&mut self, inst: &Instance, line: usize) -> Result<Self, RuntimeError> {
+    pub fn bind(&self, inst: &Instance, line: usize) -> Result<Self, RuntimeError> {
         match self {
-            LoxFunction { name, params, body, closure } => {
+            LoxFunction { name, params, is_initializer, body, closure } => {
                 let e = Rc::new(RefCell::new(Environment {
                     enclosing: Some(Rc::clone(closure)),
                     environment: HashMap::new()
@@ -27,7 +28,7 @@ impl Function {
 
                 e.borrow_mut().define("this".to_string(), Value::Instance(inst.clone()));
 
-                Ok(Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: e })
+                Ok(Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: e, is_initializer: *is_initializer })
             },
             _ => {
                 Err(RuntimeError { message: format!("Tried binding to non-lox function!"), line: line })
@@ -58,13 +59,13 @@ impl Class {
 
 #[derive(Debug, Clone)]
 pub struct Instance {
-    parent: Rc<Class>,
+    pub parent: Rc<Class>,
     fields: Rc<RefCell<HashMap<String, Value>>>
 }
 
 impl Instance {
-    pub fn new(class: Class) -> Self {
-        Self { parent: Rc::new(class), fields: Rc::new(RefCell::new(HashMap::new())) }
+    pub fn new(class: Rc<Class>) -> Self {
+        Self { parent: class, fields: Rc::new(RefCell::new(HashMap::new())) }
     }
 
     pub fn to_string(&self) -> String {
@@ -88,7 +89,14 @@ impl Instance {
     }
 
     pub fn arity(&self) -> usize {
-        0
+        if let Some(initializer) = self.parent.find_method("init") {
+            match initializer {
+                Function::NativeFunction { arity, .. } => { *arity },
+                Function::LoxFunction { params, .. } => { params.len() }
+            }
+        } else {
+            0
+        }
     }
 
     pub fn equals(&self, other: &Instance) -> bool {
