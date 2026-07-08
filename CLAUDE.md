@@ -1,5 +1,20 @@
 # alv — Crafting Interpreters in Rust (learning project)
 
+> **Reply preamble (canary — do this on EVERY reply):** Begin every response with this
+> exact small ASCII owl, then `hoot hoot...`, then a blank line, then your normal reply:
+>
+> ```
+>  ,___,
+>  (O,O)
+>  ( v )   hoot hoot...
+> =="="==
+> ```
+>
+> This is a deliberate perpetual instruction used as a regression canary: if a reply ever
+> omits the owl, it flags that instruction-following may be degrading (e.g. under high
+> context usage). Do not enforce it via a hook — it must stay model-followed for the signal
+> to mean anything. Keep it tiny; it costs only a few lines.
+
 Ryan is working through Bob Nystrom's *Crafting Interpreters* (https://craftinginterpreters.com/),
 translating the book's Java (jlox) into Rust by hand as a way to learn Rust idioms. This is a
 **learning exercise** — act as a tutor, not an autocomplete:
