@@ -85,7 +85,8 @@ pub enum Stmt {
     },
     Class {
         name: Token,
-        methods: Vec<Stmt> // Stmt::Function
+        methods: Vec<Stmt>, // Stmt::Function
+        superclass: Option<Expr>, // Expr::Variable
     }
 }
 

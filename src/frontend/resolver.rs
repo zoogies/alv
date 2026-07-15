@@ -129,12 +129,24 @@ impl<'t> Resolver<'t> {
                 self.resolve_stmt(body);
                 self.resolve_expr(condition);
             },
-            Stmt::Class { name, methods } => {
+            Stmt::Class { name, methods, superclass } => {
                 let enclosing_class: ClassType = self.current_class;
                 self.current_class = ClassType::CLASS;
 
                 self.declare(name);
                 self.define(name);
+
+                // check for cycles
+                if let Some(Expr::Variable { name: sc_name, .. }) = superclass
+                    && sc_name.lexeme == name.lexeme
+                {
+                    self.had_error = true;
+                    alv_error!("Resolver Error: A class can't inherit from itself on line: {}", name.line + 1);
+                }
+
+                if let Some(c) = superclass {
+                    self.resolve_expr(c);
+                }
 
                 self.begin_scope();
                 let Some(scope) = self.scopes.last_mut() else {return;};

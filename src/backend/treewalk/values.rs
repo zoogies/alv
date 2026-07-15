@@ -40,12 +40,13 @@ impl Function {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: HashMap<String, Function>
+    pub methods: HashMap<String, Function>,
+    pub superclass: Option<Rc<Class>>,
 }
 
 impl Class {
-    pub fn new(name: &str, methods: HashMap<String, Function>) -> Self {
-        Self { name: name.to_string(), methods }
+    pub fn new(name: &str, methods: HashMap<String, Function>, superclass: Option<Rc<Class>>) -> Self {
+        Self { name: name.to_string(), methods, superclass }
     }
 
     pub fn to_string(&self) -> String {
@@ -53,7 +54,14 @@ impl Class {
     }
 
     pub fn find_method(&self, name: &str) -> Option<&Function> {
-        self.methods.get(name)
+        if self.methods.contains_key(name) {
+            return self.methods.get(name);
+        }
+        if let Some(sc) = &self.superclass {
+            return sc.find_method(name);
+        }
+
+        None
     }
 }
 

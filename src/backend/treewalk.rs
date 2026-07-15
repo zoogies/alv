@@ -339,7 +339,15 @@ impl TWInterp {
                     }
                 }
             },
-            Stmt::Class { name, methods } => {
+            Stmt::Class { name, methods, superclass } => {
+                let superclass = match superclass {
+                    Some(expr) => match self.evaluate(expr)? {
+                        Value::Class(c) => Some(Rc::new(c)),
+                        _ => return Err(Interrupt::Error(RuntimeError { message: "Superclass must be a class.".to_string(), line: name.line }))
+                    },
+                    None => None,
+                };
+                
                 self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
 
                 let mut meths: HashMap<String, Function> = HashMap::new();
@@ -358,7 +366,7 @@ impl TWInterp {
                     }
                 }
 
-                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme, meths)));
+                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme, meths, superclass)));
                 Ok(())
             }
         }
