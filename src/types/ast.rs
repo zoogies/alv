@@ -51,7 +51,12 @@ pub enum Expr {
     Variable {
         name: Token,
         id: usize // used by resolver
-    }
+    },
+    Super {
+        keyword: Token,
+        method: Token,
+        id: usize // used by resolver
+    },
 }
 
 #[derive(Debug, Clone)]

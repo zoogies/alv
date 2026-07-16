@@ -148,8 +148,14 @@ impl<'t> Resolver<'t> {
                     self.resolve_expr(c);
                 }
 
+                if superclass.is_some() {
+                    self.begin_scope();
+                    let Some(scope) = self.scopes.last_mut() else {return;}; // TODO: is returning a bug?
+                    scope.insert("super".to_string(), true);
+                }
+
                 self.begin_scope();
-                let Some(scope) = self.scopes.last_mut() else {return;};
+                let Some(scope) = self.scopes.last_mut() else {return;}; // TODO: is returning a bug?
                 scope.insert("this".to_string(), true);
 
                 for method in methods {
@@ -160,6 +166,10 @@ impl<'t> Resolver<'t> {
                 }
 
                 self.end_scope();
+
+                if superclass.is_some() {
+                    self.end_scope();
+                }
 
                 self.current_class = enclosing_class;
             }
@@ -223,6 +233,9 @@ impl<'t> Resolver<'t> {
                     self.had_error = true;
                 }
 
+                self.resolve_local(*id, keyword);
+            },
+            Expr::Super { keyword, id, .. } => {
                 self.resolve_local(*id, keyword);
             }
         }

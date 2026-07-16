@@ -33,8 +33,25 @@ impl TWInterp {
             Expr::Call { callee, paren, args } => self.eval_call(callee, paren.clone(), args),
             Expr::Get { object, name } => self.eval_get(object, name.clone()),
             Expr::Set { object, value, name } => self.eval_set(object, value, name.clone()),
+            Expr::Super { method, id, .. } => self.eval_super(id, method),
             Expr::This { keyword, id } => self.lookup_variable(keyword, *id),
         }
+    }
+
+    fn eval_super(&self, id: &usize, method: &Token) -> Result<Value, RuntimeError> {
+        // TODO: replace unreachable with runtime errors? I'm tired...
+        let Some(dist) = self.locals.get(id) else { unreachable!() };
+        let Some(Value::Class(superclass)) = self.environment.borrow().get_at(*dist, "super") else { unreachable!() };
+        let Some(Value::Instance(object)) = self.environment.borrow().get_at(*dist - 1, "this") else { unreachable!() };
+
+        let Some(method_fn) = superclass.find_method(&method.lexeme) else {
+            return Err(RuntimeError {
+                message: format!("Undefined property '{}'.", method.lexeme),
+                line: method.line
+            });
+        };
+
+        Ok(Value::Function(method_fn.bind(&object, method.line)?))
     }
 
     fn eval_literal(&self, value: &Literal) -> Result<Value, RuntimeError> {
@@ -199,7 +216,7 @@ impl TWInterp {
         match callee {
             Value::Function(f) => Ok(self.call_function(&f, &args)?),
             Value::Class(c) => {
-                let v = Instance::new(Rc::new(c));
+                let v = Instance::new(c);
 
                 if let Some(initializer) = v.parent.find_method("init") {
                     if let Ok(r) = initializer.bind(&v, paren.line) {                        
@@ -342,13 +359,24 @@ impl TWInterp {
             Stmt::Class { name, methods, superclass } => {
                 let superclass = match superclass {
                     Some(expr) => match self.evaluate(expr)? {
-                        Value::Class(c) => Some(Rc::new(c)),
+                        Value::Class(c) => Some(c),
                         _ => return Err(Interrupt::Error(RuntimeError { message: "Superclass must be a class.".to_string(), line: name.line }))
                     },
                     None => None,
                 };
                 
                 self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
+
+                // TODO: OPTIMIZATION: don't do this unless superclass.is_some()
+                let prev = Rc::clone(&self.environment);
+
+                if let Some(sc) = &superclass {
+                    self.environment = Rc::new(RefCell::new(Environment {
+                        environment: HashMap::new(),
+                        enclosing: Some(Rc::clone(&self.environment))
+                    }));
+                    self.environment.borrow_mut().define("super".to_string(), Value::Class(Rc::clone(sc)));
+                };
 
                 let mut meths: HashMap<String, Function> = HashMap::new();
                 for method in methods {
@@ -366,7 +394,11 @@ impl TWInterp {
                     }
                 }
 
-                self.environment.borrow_mut().assign(&name.lexeme, Value::Class(Class::new(&name.lexeme, meths, superclass)));
+                let klass = Value::Class(Rc::new(Class::new(&name.lexeme, meths, superclass)));
+
+                self.environment = prev;
+
+                self.environment.borrow_mut().assign(&name.lexeme, klass);
                 Ok(())
             }
         }

@@ -121,7 +121,7 @@ pub enum Value {
     Boolean(bool),
     Nil,
     Function(Function),
-    Class(Class),
+    Class(Rc<Class>),
     Instance(Instance)
 }
 

@@ -244,6 +244,14 @@ impl Parser {
         if self.match_token(&[TokenType::True])  { return Ok(Expr::Literal { value: Literal::Bool(true)  }); }
         if self.match_token(&[TokenType::Nil])   { return Ok(Expr::Literal { value: Literal::Nil         }); }
         
+        if self.match_token(&[TokenType::Super]) {
+            let keyword = self.previous().clone();
+            self.consume(TokenType::Dot, "Expect '.' after 'super'.".to_string())?;
+            let method = self.consume(TokenType::Identifier, "Expect superclass method name.".to_string())?.clone();
+            self.id_counter += 1;
+            return Ok(Expr::Super { keyword, method, id: self.id_counter - 1 })
+        }
+
         if self.match_token(&[TokenType::This]) {
             self.id_counter += 1;
             return Ok(Expr::This { keyword: self.previous().clone(), id: self.id_counter - 1 });
