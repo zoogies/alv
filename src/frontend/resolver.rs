@@ -16,7 +16,8 @@ enum FunctionType {
 #[derive(Clone, Copy, PartialEq)]
 enum ClassType {
     NONE,
-    CLASS
+    CLASS,
+    SUBCLASS,
 }
 
 pub struct Resolver<'t> {
@@ -145,6 +146,7 @@ impl<'t> Resolver<'t> {
                 }
 
                 if let Some(c) = superclass {
+                    self.current_class = ClassType::SUBCLASS;
                     self.resolve_expr(c);
                 }
 
@@ -236,7 +238,19 @@ impl<'t> Resolver<'t> {
                 self.resolve_local(*id, keyword);
             },
             Expr::Super { keyword, id, .. } => {
-                self.resolve_local(*id, keyword);
+                match self.current_class {
+                    ClassType::SUBCLASS => {
+                        self.resolve_local(*id, keyword);
+                    },
+                    ClassType::NONE => {
+                        alv_error!("[line {}] Can't use 'super' outside of a class.", keyword.line + 1);
+                        self.had_error = true;
+                    },
+                    ClassType::CLASS => {
+                        alv_error!("[line {}] Can't use 'super' in a class with no superclass.", keyword.line + 1);
+                        self.had_error = true;
+                    }
+                }
             }
         }
     }
