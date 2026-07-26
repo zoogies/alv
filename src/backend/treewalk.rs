@@ -2,6 +2,8 @@ mod environment;
 mod natives;
 mod values;
 
+use rustc_hash::FxHashMap;
+
 use crate::types::token::*;
 use crate::types::ast::*;
 
@@ -11,7 +13,7 @@ use self::values::*;
 use self::environment::*;
 use self::natives::register_natives;
 
-use std::{cell::RefCell, collections::HashMap, process::ExitCode, rc::Rc};
+use std::{cell::RefCell, process::ExitCode, rc::Rc};
 
 #[derive(Default)]
 pub struct TWInterp {
@@ -345,10 +347,10 @@ impl TWInterp {
             Stmt::Return { keyword, value } => {
                 match value {
                     None => {
-                        return Err(Interrupt::Return { keyword: keyword.clone(), value: None });
+                        return Err(Interrupt::Return { line: keyword.line, value: None });
                     },
                     Some(v) => {
-                        Err(Interrupt::Return{keyword: keyword.clone(), value: Some(self.evaluate(&v)?)})
+                        Err(Interrupt::Return{line: keyword.line, value: Some(self.evaluate(&v)?)})
                     }
                 }
             },
@@ -372,7 +374,7 @@ impl TWInterp {
                     self.environment.borrow_mut().define("super".to_string(), Value::Class(Rc::clone(sc)));
                 };
 
-                let mut meths: HashMap<String, Function> = HashMap::new();
+                let mut meths: FxHashMap<String, Function> = FxHashMap::default();
                 for method in methods {
                     if let Stmt::Function (decl) = method {
                         meths.insert(
@@ -408,8 +410,8 @@ impl TWInterp {
                         Interrupt::Error(error) => {
                             alv_error!("Runtime error on line {}! {}", error.line + 1, error.message);
                         },
-                        Interrupt::Return{keyword, ..} => {
-                            alv_error!("Runtime error on line {}! Trying to return a value from non-returning scoped block.", keyword.line + 1);
+                        Interrupt::Return{line, ..} => {
+                            alv_error!("Runtime error on line {}! Trying to return a value from non-returning scoped block.", line + 1);
                         }
                     }
                     return ExitCode::FAILURE;

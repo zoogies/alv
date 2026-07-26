@@ -1,9 +1,9 @@
+use rustc_hash::FxHashMap;
+
 use crate::backend::treewalk::TWInterp;
 use crate::types::ast::*;
 use crate::types::token::*;
 use crate::util::log::*;
-
-use std::{collections::HashMap};
 
 #[derive(Clone, PartialEq)]
 enum FunctionType {
@@ -22,7 +22,7 @@ enum ClassType {
 
 pub struct Resolver<'t> {
     interpreter: &'t mut TWInterp,
-    scopes: Vec<HashMap<String, bool>>,
+    scopes: Vec<FxHashMap<String, bool>>,
     current_function: FunctionType,
     current_class: ClassType,
     had_error: bool
@@ -39,7 +39,7 @@ impl<'t> Resolver<'t> {
     // -------------   SCOPING   --------------- 
 
     fn begin_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(FxHashMap::default());
     }
 
     fn end_scope(&mut self) {
@@ -50,6 +50,12 @@ impl<'t> Resolver<'t> {
         if self.scopes.len() < 1 { return; }
 
         let Some(scope) = self.scopes.last_mut() else { return; };
+        
+        if scope.contains_key(&name.lexeme) {
+            self.had_error = true;
+            alv_error!("Resolver Error: Re-declaration of variable on line: {}", name.line + 1);
+        }
+        
         scope.insert(name.lexeme.clone(), false);
     }
 
@@ -230,7 +236,7 @@ impl<'t> Resolver<'t> {
                 self.resolve_expr(value);
             },
             Expr::This { id, keyword } => {
-                if self.current_class != ClassType::CLASS {
+                if self.current_class == ClassType::NONE {
                     alv_error!("[line {}] Can't use 'this' outside of a class.", keyword.line + 1);
                     self.had_error = true;
                 }

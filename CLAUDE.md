@@ -40,6 +40,14 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
   waiting to be asked each time. When he states an *explicit* preference (not an inferred
   observation), record it the same turn — don't downgrade it to an "I'll note that" offer and
   then drop it. The offer-first rule below is only for inferred observations about him.
+- **Keep this file lean, and prune it proactively — don't wait to be asked.** Every line here
+  costs context on every single turn, so only absolutely essential tokens earn their place.
+  Whenever you edit this file, first re-read the whole thing and delete what's gone stale
+  (fixed bugs, superseded numbers, advice about code that no longer exists) and compact what's
+  merely verbose into its shortest faithful form. Prefer one dense line over five explanatory
+  ones; the reasoning behind a decision usually doesn't need to be preserved, only the decision.
+  Be conservative with his explicitly stated preferences — compress their wording, never drop
+  their substance.
 - **When he asks for a cleanup/critique, first judge whether the code is already acceptably
   good — and if it is, say so plainly and stop.** He cares about acceptably-good code, not
   perfection; when he goes out of his way to ask, it's usually because he already senses an
@@ -83,3 +91,41 @@ page directly (e.g. `.../a-tree-walking-interpreter.html`, `.../evaluating-expre
 `.../statements-and-state.html`) when you need to quote or check the Java source rather than
 relying on memory, since getting the Java snippet exactly right is the whole point of grounding
 explanations in the text.
+
+## Benchmarking against jlox
+
+Reference jlox: `C:\Users\ryan\Documents\GitHub\craftinginterpreters`, built with `make jlox`
+(Java + GNU Make only — Dart is NOT needed, `Expr.java`/`Stmt.java` are checked in). Run
+`./jlox f.lox` in Git Bash, or `java -cp build/java com.craftinginterpreters.lox.Lox f.lox` in
+PowerShell. The book's 11 benchmarks live in `tests/bench/`.
+
+**Three rules, each learned the hard way:**
+
+1. Measure `./target/release/alv.exe`. Debug is ~4.6× slower (once cost us a phantom regression).
+2. Never wall-clock a JIT. ~150 ms is JVM startup and HotSpot needs thousands of iterations to
+   compile — short runs flatter alv badly and once had us wrongly concluding alv *beat* jlox.
+3. Time inside the program with `clock()`; size workloads to several seconds.
+
+**Regression check:** diff every `tests/*.lox` across both interpreters. Strip alv's
+`[INFO]`/`[ERROR]` prefixes and banner, normalize CRLF, or you get pages of phantom diffs.
+
+**Known parity gaps** (all pre-existing, none urgent): alv prints `"Foo Instance"` vs the book's
+`"Foo instance"`; resolver errors omit the book's `Error at '<token>':` clause; `declare` has no
+"Already a variable with this name in this scope" check, so alv accepts `var a` twice in one
+local scope where jlox errors.
+
+### Perf baseline, 2026-07-26 (in-program clock, JIT warm)
+
+fib(35) **7.9 s vs jlox 2.0 s**. Rest of the suite sits at 1.8–2.2×, except `define` at 4.4×
+(a `String` alloc per binding). Session went 25× → ~4× by, in order of payoff: sharing the
+function AST via `Stmt::Function(Rc<FuncDecl>)` instead of deep-cloning it on every lookup;
+`get_mut` instead of allocate-then-`insert` in `assign`; `FxHashMap` for environments (~20%);
+`locals` `HashMap<usize,usize>` → `Vec<Option<usize>>`; `Interrupt::Return` carrying `line:
+usize` instead of a cloned `Token`.
+
+**Slot-indexed environments were deliberately skipped.** Worth maybe 1.4×, but it's the only
+remaining change touching parser + resolver + interpreter together, with silent wrong-answer
+bugs if their orderings drift — and clox in Part III solves it properly with a flat value stack.
+If he revisits it: 2.5–4× slower than jlox is *normal* for a faithful `Rc<RefCell<Environment>>`
+translation. The gap is the JVM's generational GC making the ~5 short-lived allocations per call
+nearly free; `malloc`/`free` can't match that. Design property, not bad Rust.

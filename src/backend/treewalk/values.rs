@@ -1,9 +1,11 @@
+use rustc_hash::FxHashMap;
+
 use crate::{backend::treewalk::values::Function::LoxFunction, types::token::Token};
 use crate::types::ast::FuncDecl;
 use super::TWInterp;
 use crate::backend::treewalk::environment::Environment;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -35,12 +37,12 @@ impl Function {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: HashMap<String, Function>,
+    pub methods: FxHashMap<String, Function>,
     pub superclass: Option<Rc<Class>>,
 }
 
 impl Class {
-    pub fn new(name: &str, methods: HashMap<String, Function>, superclass: Option<Rc<Class>>) -> Self {
+    pub fn new(name: &str, methods: FxHashMap<String, Function>, superclass: Option<Rc<Class>>) -> Self {
         Self { name: name.to_string(), methods, superclass }
     }
 
@@ -63,12 +65,12 @@ impl Class {
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub parent: Rc<Class>,
-    fields: Rc<RefCell<HashMap<String, Value>>>
+    fields: Rc<RefCell<FxHashMap<String, Value>>>
 }
 
 impl Instance {
     pub fn new(class: Rc<Class>) -> Self {
-        Self { parent: class, fields: Rc::new(RefCell::new(HashMap::new())) }
+        Self { parent: class, fields: Rc::new(RefCell::new(FxHashMap::default())) }
     }
 
     pub fn to_string(&self) -> String {
@@ -122,7 +124,7 @@ pub enum Value {
 
 pub enum Interrupt {
     Return{
-        keyword: Token,
+        line: usize,
         value: Option<Value>
     },
     Error(RuntimeError)
