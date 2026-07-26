@@ -1,5 +1,4 @@
 use super::token::{Token, Literal};
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::util::log::*;

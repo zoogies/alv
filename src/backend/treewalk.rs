@@ -17,7 +17,7 @@ use std::{cell::RefCell, collections::HashMap, process::ExitCode, rc::Rc};
 pub struct TWInterp {
     environment: Rc<RefCell<Environment>>,
     globals: Rc<RefCell<Environment>>,
-    locals: HashMap<usize, usize>
+    locals: Vec<Option<usize>>
 }
 
 impl TWInterp {
@@ -40,9 +40,9 @@ impl TWInterp {
 
     fn eval_super(&self, id: &usize, method: &Token) -> Result<Value, RuntimeError> {
         // TODO: replace unreachable with runtime errors? I'm tired...
-        let Some(dist) = self.locals.get(id) else { unreachable!() };
-        let Some(Value::Class(superclass)) = self.environment.borrow().get_at(*dist, "super") else { unreachable!() };
-        let Some(Value::Instance(object)) = self.environment.borrow().get_at(*dist - 1, "this") else { unreachable!() };
+        let Some(dist) = self.locals[*id] else { unreachable!() };
+        let Some(Value::Class(superclass)) = self.environment.borrow().get_at(dist, "super") else { unreachable!() };
+        let Some(Value::Instance(object)) = self.environment.borrow().get_at(dist - 1, "this") else { unreachable!() };
 
         let Some(method_fn) = superclass.find_method(&method.lexeme) else {
             return Err(RuntimeError {
@@ -152,8 +152,8 @@ impl TWInterp {
     fn eval_assign(&mut self, name: &Token, value: &Expr, id: usize) -> Result<Value, RuntimeError> {
         let value = self.evaluate(value)?;
         
-        if let Some(dist) = self.locals.get(&id) {
-            self.environment.borrow_mut().assign_at(*dist, &name.lexeme, value.clone());
+        if let Some(dist) = self.locals[id] {
+            self.environment.borrow_mut().assign_at(dist, &name.lexeme, value.clone());
         } else {
             self.globals.borrow_mut().assign(&name.lexeme, value.clone());
         };
@@ -429,11 +429,11 @@ impl TWInterp {
         ExitCode::SUCCESS
     }
 
-    pub fn new() -> Self {
+    pub fn new(prealloc: &usize) -> Self {
         let mut s = Self {
             environment: Rc::new(RefCell::new(Environment::default())),
             globals: Rc::new(RefCell::new(Environment::default())),
-            locals: HashMap::default()
+            locals: vec![None; *prealloc]
         };
         s.environment = Rc::clone(&s.globals);
 
@@ -445,12 +445,16 @@ impl TWInterp {
     // RESOLVER
 
     pub fn resolve(&mut self, id: usize, depth: usize) {
-        self.locals.insert(id, depth);
+        if id >= self.locals.len() {
+            self.locals.resize(id + 1, None);
+        }
+
+        self.locals[id] = Some(depth);
     }
 
     fn lookup_variable(&self, name: &Token, id: usize) -> Result<Value, RuntimeError> {
-        let found = if let Some(dist) = self.locals.get(&id) {
-            self.environment.borrow().get_at(*dist, &name.lexeme)
+        let found = if let Some(dist) = self.locals[id] {
+            self.environment.borrow().get_at(dist, &name.lexeme)
         } else {
             self.globals.borrow().get(&name.lexeme)
         };

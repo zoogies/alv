@@ -6,7 +6,7 @@ use std::{rc::Rc};
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
-    id_counter: usize
+    pub id_counter: usize
 }
 
 impl Parser {

@@ -66,7 +66,7 @@ fn main() -> ExitCode {
             println!("\n");
             alv_log!("------------- Interpreter Output -------------");
             
-            let mut i = TWInterp::new();
+            let mut i = TWInterp::new(&p.id_counter);
             
             let mut r = Resolver::new(&mut i);
             if r.resolve(&e) {
