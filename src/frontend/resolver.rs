@@ -46,16 +46,20 @@ impl<'t> Resolver<'t> {
         self.scopes.pop();
     }
 
+    fn error(&mut self, token: &Token, message: &str) {
+        self.had_error = true;
+        alv_error!("[line {}] Error at '{}': {}", token.line + 1, token.lexeme, message);
+    }
+
     fn declare(&mut self, name: &Token) {
         if self.scopes.len() < 1 { return; }
 
-        let Some(scope) = self.scopes.last_mut() else { return; };
-        
-        if scope.contains_key(&name.lexeme) {
-            self.had_error = true;
-            alv_error!("Resolver Error: Re-declaration of variable on line: {}", name.line + 1);
+        let duplicate = self.scopes.last().is_some_and(|s| s.contains_key(&name.lexeme));
+        if duplicate {
+            self.error(name, "Already a variable with this name in this scope.");
         }
-        
+
+        let Some(scope) = self.scopes.last_mut() else { return; };
         scope.insert(name.lexeme.clone(), false);
     }
 
@@ -119,14 +123,12 @@ impl<'t> Resolver<'t> {
             },
             Stmt::Return { value, keyword } => {
                 if self.current_function == FunctionType::NONE {
-                    self.had_error = true;
-                    alv_error!("Resolver Error: Can't return from top level code on line: {}", keyword.line + 1);
+                    self.error(keyword, "Can't return from top-level code.");
                 }
 
                 if let Some(value) = value {
                     if self.current_function == FunctionType::INITIALIZER {
-                        self.had_error = true;
-                        alv_error!("Resolver Error: Can't return from an initializer on line: {}", keyword.line + 1);
+                        self.error(keyword, "Can't return a value from an initializer.");
                     }
                 
                     self.resolve_expr(value)
@@ -147,8 +149,8 @@ impl<'t> Resolver<'t> {
                 if let Some(Expr::Variable { name: sc_name, .. }) = superclass
                     && sc_name.lexeme == name.lexeme
                 {
-                    self.had_error = true;
-                    alv_error!("Resolver Error: A class can't inherit from itself on line: {}", name.line + 1);
+                    let sc_name = sc_name.clone();
+                    self.error(&sc_name, "A class can't inherit from itself.");
                 }
 
                 if let Some(c) = superclass {
@@ -196,11 +198,8 @@ impl<'t> Resolver<'t> {
     fn resolve_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Variable { name, id } => {
-                if let Some(scope) = self.scopes.last() {
-                    if scope.get(&name.lexeme) == Some(&false) {
-                        alv_error!("[line {}] Can't read local variable in its own initializer.", name.line + 1);
-                        self.had_error = true;
-                    }
+                if self.scopes.last().is_some_and(|s| s.get(&name.lexeme) == Some(&false)) {
+                    self.error(name, "Can't read local variable in its own initializer.");
                 }
 
                 self.resolve_local(*id, name);
@@ -237,8 +236,7 @@ impl<'t> Resolver<'t> {
             },
             Expr::This { id, keyword } => {
                 if self.current_class == ClassType::NONE {
-                    alv_error!("[line {}] Can't use 'this' outside of a class.", keyword.line + 1);
-                    self.had_error = true;
+                    self.error(keyword, "Can't use 'this' outside of a class.");
                 }
 
                 self.resolve_local(*id, keyword);
@@ -249,12 +247,10 @@ impl<'t> Resolver<'t> {
                         self.resolve_local(*id, keyword);
                     },
                     ClassType::NONE => {
-                        alv_error!("[line {}] Can't use 'super' outside of a class.", keyword.line + 1);
-                        self.had_error = true;
+                        self.error(keyword, "Can't use 'super' outside of a class.");
                     },
                     ClassType::CLASS => {
-                        alv_error!("[line {}] Can't use 'super' in a class with no superclass.", keyword.line + 1);
-                        self.had_error = true;
+                        self.error(keyword, "Can't use 'super' in a class with no superclass.");
                     }
                 }
             }

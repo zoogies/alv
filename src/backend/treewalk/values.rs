@@ -74,7 +74,7 @@ impl Instance {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{} Instance", &self.parent.to_string())
+        format!("{} instance", self.parent.to_string())
     }
 
     pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
