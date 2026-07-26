@@ -10,6 +10,6 @@ pub fn register_natives(env: &mut Environment) {
 
 fn clock(_interp: &mut TWInterp, _args: &[Value]) -> Result<Value, RuntimeError> {
     Ok(
-        Value::Number(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs() as f64)
+        Value::Number(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs_f64() as f64)
     )
 }

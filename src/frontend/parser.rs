@@ -1,6 +1,8 @@
 use crate::types::token::*;
 use crate::types::ast::*;
 
+use std::{cell::RefCell, rc::Rc};
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
@@ -463,7 +465,7 @@ impl Parser {
         self.consume(TokenType::RightParen, "Expect ')' after parameters.".to_string())?;
         self.consume(TokenType::LeftBrace, format!("Expect '{{' before {kind} body."))?;
 
-        Ok(Stmt::Function { name: name, params: parameters, body: self.block_statement()? })
+        Ok(Stmt::Function { name: name, params: parameters, body: Rc::new(RefCell::new(self.block_statement()?)) })
     }
 
     fn desugaring_for(&mut self) -> ParseResult<Stmt> {

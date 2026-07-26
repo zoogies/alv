@@ -11,7 +11,7 @@ pub enum Function {
     LoxFunction{
         name: Token,
         params: Vec<Token>,
-        body: Vec<Stmt>,
+        body: Rc<RefCell<Vec<Stmt>>>,
         closure: Rc<RefCell<Environment>>,
         is_initializer: bool,
     }

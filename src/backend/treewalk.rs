@@ -247,7 +247,7 @@ impl TWInterp {
                     e.borrow_mut().define(params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
                 }
 
-                let r = self.execute_block(body, e);
+                let r = self.execute_block(&body.borrow(), e);
                 if let Err(Interrupt::Error(err)) = r {
                     return Err(err);
                 }
@@ -340,7 +340,7 @@ impl TWInterp {
                 self.environment.borrow_mut().define(
                     name.lexeme.clone(),
                     Value::Function(
-                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: Rc::clone(&self.environment), is_initializer: false }
+                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: Rc::clone(body), closure: Rc::clone(&self.environment), is_initializer: false }
                     )
                 );
 

@@ -98,7 +98,7 @@ impl<'t> Resolver<'t> {
             Stmt::Function { name, params, body } => {
                 self.declare(name);
                 self.define(name);
-                self.resolve_function(params, body, FunctionType::FUNCTION);
+                self.resolve_function(params, &body.borrow(), FunctionType::FUNCTION);
             },
             Stmt::Expression(e) => {
                 self.resolve_expr(e);
@@ -163,7 +163,7 @@ impl<'t> Resolver<'t> {
                 for method in methods {
                     if let Stmt::Function { params, body, name: mname } = method {
                         let ty = if mname.lexeme == "init" { FunctionType::INITIALIZER } else { FunctionType::METHOD };
-                        self.resolve_function(params, body, ty);
+                        self.resolve_function(params, &body.borrow(), ty);
                     }
                 }
 

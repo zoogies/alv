@@ -1,4 +1,6 @@
 use super::token::{Token, Literal};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::util::log::*;
 use crate::types::token::*;
@@ -86,7 +88,7 @@ pub enum Stmt {
     Function {
         name: Token,
         params: Vec<Token>,
-        body: Vec<Stmt>
+        body: Rc<RefCell<Vec<Stmt>>>
     },
     Class {
         name: Token,
