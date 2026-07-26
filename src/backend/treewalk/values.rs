@@ -1,5 +1,5 @@
 use crate::{backend::treewalk::values::Function::LoxFunction, types::token::Token};
-use crate::types::ast::Stmt;
+use crate::types::ast::FuncDecl;
 use super::TWInterp;
 use crate::backend::treewalk::environment::Environment;
 
@@ -9,9 +9,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 pub enum Function {
     NativeFunction{arity: usize, imp: fn(&mut TWInterp, &[Value]) -> Result<Value, RuntimeError>},
     LoxFunction{
-        name: Token,
-        params: Vec<Token>,
-        body: Rc<RefCell<Vec<Stmt>>>,
+        decl: Rc<FuncDecl>,
         closure: Rc<RefCell<Environment>>,
         is_initializer: bool,
     }
@@ -20,7 +18,7 @@ pub enum Function {
 impl Function {
     pub fn bind(&self, inst: &Instance, line: usize) -> Result<Self, RuntimeError> {
         match self {
-            LoxFunction { name, params, is_initializer, body, closure } => {
+            LoxFunction { decl, is_initializer, closure } => {
                 let e = Rc::new(RefCell::new(Environment {
                     enclosing: Some(Rc::clone(closure)),
                     environment: HashMap::new()
@@ -28,7 +26,7 @@ impl Function {
 
                 e.borrow_mut().define("this".to_string(), Value::Instance(inst.clone()));
 
-                Ok(Function::LoxFunction { name: name.clone(), params: params.clone(), body: body.clone(), closure: e, is_initializer: *is_initializer })
+                Ok(Function::LoxFunction { decl: Rc::clone(decl), closure: e, is_initializer: *is_initializer })
             },
             _ => {
                 Err(RuntimeError { message: format!("Tried binding to non-lox function!"), line: line })
@@ -100,7 +98,7 @@ impl Instance {
         if let Some(initializer) = self.parent.find_method("init") {
             match initializer {
                 Function::NativeFunction { arity, .. } => { *arity },
-                Function::LoxFunction { params, .. } => { params.len() }
+                Function::LoxFunction { decl, .. } => { decl.params.len() }
             }
         } else {
             0
@@ -161,7 +159,7 @@ pub fn alv_stringify(value: &Value) -> String {
             Value::Function(f) => {
                 match f {
                     Function::NativeFunction { .. } => { "<NATIVE FUNCTION>".to_string() },
-                    Function::LoxFunction { name, .. } => { format!("<Fn {}>", name.lexeme) }
+                    Function::LoxFunction { decl, .. } => { format!("<Fn {}>", decl.name.lexeme) }
                 }
             },
             Value::Class(c) => {

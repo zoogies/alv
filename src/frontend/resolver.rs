@@ -95,10 +95,10 @@ impl<'t> Resolver<'t> {
                 }
                 self.define(name);
             },
-            Stmt::Function { name, params, body } => {
-                self.declare(name);
-                self.define(name);
-                self.resolve_function(params, &body.borrow(), FunctionType::FUNCTION);
+            Stmt::Function (decl) => {
+                self.declare(&decl.name);
+                self.define(&decl.name);
+                self.resolve_function(&decl.params, &decl.body, FunctionType::FUNCTION);
             },
             Stmt::Expression(e) => {
                 self.resolve_expr(e);
@@ -161,9 +161,9 @@ impl<'t> Resolver<'t> {
                 scope.insert("this".to_string(), true);
 
                 for method in methods {
-                    if let Stmt::Function { params, body, name: mname } = method {
-                        let ty = if mname.lexeme == "init" { FunctionType::INITIALIZER } else { FunctionType::METHOD };
-                        self.resolve_function(params, &body.borrow(), ty);
+                    if let Stmt::Function (decl) = method {
+                        let ty = if decl.name.lexeme == "init" { FunctionType::INITIALIZER } else { FunctionType::METHOD };
+                        self.resolve_function(&decl.params, &decl.body, ty);
                     }
                 }
 

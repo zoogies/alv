@@ -30,9 +30,9 @@ impl TWInterp {
             Expr::Variable { name, id } => self.lookup_variable(name, *id),
             Expr::Assign { name, value, id } => self.eval_assign(name, value, *id),
             Expr::Logical { left, operator, right } => self.eval_logical(left, operator, right),
-            Expr::Call { callee, paren, args } => self.eval_call(callee, paren.clone(), args),
-            Expr::Get { object, name } => self.eval_get(object, name.clone()),
-            Expr::Set { object, value, name } => self.eval_set(object, value, name.clone()),
+            Expr::Call { callee, paren, args } => self.eval_call(callee, paren, args),
+            Expr::Get { object, name } => self.eval_get(object, name),
+            Expr::Set { object, value, name } => self.eval_set(object, value, name),
             Expr::Super { method, id, .. } => self.eval_super(id, method),
             Expr::This { keyword, id } => self.lookup_variable(keyword, *id),
         }
@@ -174,7 +174,7 @@ impl TWInterp {
         self.evaluate(right)
     }
 
-    fn eval_get(&mut self, object: &Box<Expr>, name: Token) -> Result<Value, RuntimeError> {
+    fn eval_get(&mut self, object: &Box<Expr>, name: &Token) -> Result<Value, RuntimeError> {
         match self.evaluate(&object)? {
             Value::Instance(i) => {
                 i.get(&name)
@@ -183,7 +183,7 @@ impl TWInterp {
         }
     }
 
-    fn eval_set(&mut self, object: &Box<Expr>, value: &Box<Expr>, name: Token) -> Result<Value, RuntimeError> {
+    fn eval_set(&mut self, object: &Box<Expr>, value: &Box<Expr>, name: &Token) -> Result<Value, RuntimeError> {
         match self.evaluate(&object)? {
             Value::Instance(i) => {
                 let value = self.evaluate(value)?;
@@ -194,7 +194,7 @@ impl TWInterp {
         }        
     }
 
-    fn eval_call(&mut self, callee: &Box<Expr>, paren: Token, arguments: &Vec<Expr> ) -> Result<Value, RuntimeError> {
+    fn eval_call(&mut self, callee: &Box<Expr>, paren: &Token, arguments: &Vec<Expr> ) -> Result<Value, RuntimeError> {
         let callee = self.evaluate(&callee)?;
 
         let mut args = Vec::new();
@@ -203,9 +203,9 @@ impl TWInterp {
         }
 
         let arity = match &callee {
-            Value::Function(Function::LoxFunction { params, .. }) => { params.len() },
+            Value::Function(Function::LoxFunction { decl, .. }) => { decl.params.len() },
             Value::Function(Function::NativeFunction { arity, .. }) => { *arity },
-            Value::Class(c) => { if let Some(Function::LoxFunction { params, .. }) = c.find_method("init") { params.len() } else { 0 } }
+            Value::Class(c) => { if let Some(Function::LoxFunction { decl, .. }) = c.find_method("init") { decl.params.len() } else { 0 } }
             _ => { return Err(RuntimeError{message: "Can only call functions and classes.".to_string(), line:paren.line}); }
         };
 
@@ -235,7 +235,7 @@ impl TWInterp {
             Function::NativeFunction { imp, .. } => {
                 Ok(imp(self, args)?)
             },
-            Function::LoxFunction { params, body, closure, is_initializer, .. } => {
+            Function::LoxFunction { decl, closure, is_initializer, .. } => {
                 let e = Rc::new(RefCell::new(
                     Environment {
                         enclosing: Some(Rc::clone(closure)),
@@ -244,10 +244,10 @@ impl TWInterp {
                 ));
 
                 for (i, arg) in args.iter().enumerate() {
-                    e.borrow_mut().define(params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
+                    e.borrow_mut().define(decl.params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
                 }
 
-                let r = self.execute_block(&body.borrow(), e);
+                let r = self.execute_block(&decl.body, e);
                 if let Err(Interrupt::Error(err)) = r {
                     return Err(err);
                 }
@@ -336,11 +336,15 @@ impl TWInterp {
                 }
                 Ok(())
             },
-            Stmt::Function { name, params, body } => {
+            Stmt::Function (decl) => {
                 self.environment.borrow_mut().define(
-                    name.lexeme.clone(),
+                    decl.name.lexeme.clone(),
                     Value::Function(
-                        Function::LoxFunction { name: name.clone(), params: params.clone(), body: Rc::clone(body), closure: Rc::clone(&self.environment), is_initializer: false }
+                        Function::LoxFunction { 
+                            decl: Rc::clone(decl),
+                            closure: Rc::clone(&self.environment),
+                            is_initializer: false
+                        }
                     )
                 );
 
@@ -380,15 +384,13 @@ impl TWInterp {
 
                 let mut meths: HashMap<String, Function> = HashMap::new();
                 for method in methods {
-                    if let Stmt::Function { name: mname, params, body } = method {
+                    if let Stmt::Function (decl) = method {
                         meths.insert(
-                            mname.lexeme.clone(),
+                            decl.name.lexeme.clone(),
                             Function::LoxFunction {
-                                name: mname.clone(),
-                                params: params.clone(),
-                                body: body.clone(),
+                                decl: Rc::clone(decl),
                                 closure: Rc::clone(&self.environment),
-                                is_initializer: mname.lexeme.eq("init")
+                                is_initializer: decl.name.lexeme.eq("init")
                             }
                         );
                     }

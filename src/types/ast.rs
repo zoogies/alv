@@ -61,6 +61,13 @@ pub enum Expr {
     },
 }
 
+#[derive(Debug)]
+pub struct FuncDecl {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expression(Box<Expr>),
@@ -85,11 +92,7 @@ pub enum Stmt {
         condition: Expr,
         body: Box<Stmt>
     },
-    Function {
-        name: Token,
-        params: Vec<Token>,
-        body: Rc<RefCell<Vec<Stmt>>>
-    },
+    Function(Rc<FuncDecl>),
     Class {
         name: Token,
         methods: Vec<Stmt>, // Stmt::Function
