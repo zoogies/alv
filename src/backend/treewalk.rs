@@ -179,7 +179,7 @@ impl TWInterp {
             Value::Instance(i) => {
                 i.get(&name)
             }
-            _ => { Err(RuntimeError{message: "Only instances have properties.".to_string(), line: name.line}) }
+            _ => { Err(RuntimeError{message: "Only Instances have properties.".to_string(), line: name.line}) }
         }
     }
 
@@ -190,7 +190,7 @@ impl TWInterp {
                 i.set(&name, &value);
                 Ok(value)
             }
-            _ => { Err(RuntimeError{message: "Only instances have fields.".to_string(), line: name.line}) }
+            _ => { Err(RuntimeError{message: "Only Instances have fields.".to_string(), line: name.line}) }
         }        
     }
 
@@ -236,12 +236,7 @@ impl TWInterp {
                 Ok(imp(self, args)?)
             },
             Function::LoxFunction { decl, closure, is_initializer, .. } => {
-                let e = Rc::new(RefCell::new(
-                    Environment {
-                        enclosing: Some(Rc::clone(closure)),
-                        environment: HashMap::new()
-                    }
-                ));
+                let e = Rc::new(RefCell::new(Environment::from_enclosing(closure)));
 
                 for (i, arg) in args.iter().enumerate() {
                     e.borrow_mut().define(decl.params.get(i).expect("Params didn't match args").lexeme.clone(), arg.clone());
@@ -309,10 +304,7 @@ impl TWInterp {
                 Ok(())
             },
             Stmt::Block { statements } => {
-                let e = Rc::new(RefCell::new(Environment {
-                    environment: HashMap::new(),
-                    enclosing: Some(Rc::clone(&self.environment))
-                }));
+                let e = Rc::new(RefCell::new(Environment::from_enclosing(&Rc::clone(&self.environment))));
 
                 Ok(self.execute_block(statements, e)?)
             },
@@ -375,10 +367,8 @@ impl TWInterp {
                 let prev = Rc::clone(&self.environment);
 
                 if let Some(sc) = &superclass {
-                    self.environment = Rc::new(RefCell::new(Environment {
-                        environment: HashMap::new(),
-                        enclosing: Some(Rc::clone(&self.environment))
-                    }));
+                    self.environment = Rc::new(RefCell::new(Environment::from_enclosing(&Rc::clone(&self.environment))));
+
                     self.environment.borrow_mut().define("super".to_string(), Value::Class(Rc::clone(sc)));
                 };
 

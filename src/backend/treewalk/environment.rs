@@ -1,10 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
+
+use rustc_hash::FxHashMap;
 
 use super::values::*;
 
 #[derive(Default, Debug)]
 pub struct Environment {
-    pub environment: HashMap<String,Value>,
+    pub environment: rustc_hash::FxHashMap<String,Value>,
     pub enclosing: Option<Rc<RefCell<Environment>>>
 }
 
@@ -38,8 +40,8 @@ impl Environment {
     }
 
     pub fn assign(&mut self, k: &str, v: Value) -> bool {
-        if self.environment.contains_key(k) {
-            self.environment.insert(k.to_string(), v);
+        if let Some(slot) = self.environment.get_mut(k) {
+            *slot = v;
             true
         }
         else {
@@ -52,7 +54,7 @@ impl Environment {
 
     pub fn assign_at(&mut self, dist: usize, k: &str, v: Value) {
         if dist == 0 {
-            self.environment.insert(k.to_string(), v);
+            if let Some(slot) = self.environment.get_mut(k) { *slot = v; }
             return;
         }
 
@@ -61,6 +63,13 @@ impl Environment {
             let next = Rc::clone(env.borrow().enclosing.as_ref().unwrap());
             env = next;
         }
-        env.borrow_mut().environment.insert(k.to_string(), v);
+        if let Some(slot) = env.borrow_mut().environment.get_mut(k) { *slot = v; }
+    }
+
+    pub fn from_enclosing(enclosing: &Rc<RefCell<Self>>) -> Self {
+        Self {
+            environment: FxHashMap::default(),
+            enclosing: Some(Rc::clone(enclosing))
+        }
     }
 }

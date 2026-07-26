@@ -19,10 +19,7 @@ impl Function {
     pub fn bind(&self, inst: &Instance, line: usize) -> Result<Self, RuntimeError> {
         match self {
             LoxFunction { decl, is_initializer, closure } => {
-                let e = Rc::new(RefCell::new(Environment {
-                    enclosing: Some(Rc::clone(closure)),
-                    environment: HashMap::new()
-                }));
+                let e = Rc::new(RefCell::new(Environment::from_enclosing(closure)));
 
                 e.borrow_mut().define("this".to_string(), Value::Instance(inst.clone()));
 
