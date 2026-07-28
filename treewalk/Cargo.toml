@@ -1,7 +1,10 @@
 [package]
-name = "alv"
+name = "alv-treewalk"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+name = "alv"
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }

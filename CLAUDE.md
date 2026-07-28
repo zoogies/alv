@@ -101,7 +101,9 @@ PowerShell. The book's 11 benchmarks live in `tests/bench/`.
 
 **Three rules, each learned the hard way:**
 
-1. Measure `./target/release/alv.exe`. Debug is ~4.6× slower (once cost us a phantom regression).
+1. Measure `./target/release/alv-treewalk.exe` (or `alv-vm.exe`). Debug is ~4.6× slower (once
+   cost us a phantom regression). Build with `cargo build --release --workspace` — plain
+   `cargo build` only builds `default-members` (vm), silently leaving a stale treewalk binary.
 2. Never wall-clock a JIT. ~150 ms is JVM startup and HotSpot needs thousands of iterations to
    compile — short runs flatter alv badly and once had us wrongly concluding alv *beat* jlox.
 3. Time inside the program with `clock()`; size workloads to several seconds.

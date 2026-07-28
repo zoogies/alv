@@ -11,9 +11,6 @@ This repo is totally WIP and not a real thing you should even try to build or us
 example:
 
 ```bash
-cargo r tests/10.4.lox 
+cargo run -- tests/9.2.lox # vm (default)
+cargo run -p alv-treewalk -- tests/9.2.lox 
 ```
-
-### TODO
-
-Change Stmt::Function body into it's on struct such that we don't have to destructure with `if let` at every site.
