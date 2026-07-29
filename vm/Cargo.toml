@@ -2,3 +2,7 @@
 name = "alv-vm"
 version = "0.1.0"
 edition = "2024"
+
+[dependencies]
+num-derive = "0.5.1"
+num-traits = "0.2.19"
