@@ -1,35 +1,55 @@
+use std::io;
+use std::process::exit;
+
 use alv_vm::chunk::*;
 use alv_vm::debug::*;
 use alv_vm::value::*;
 use alv_vm::backend::vm::*;
 
-// TODO: some template T to avoid "as u8"?
+use clap::Parser as ClapParser;
+
+#[derive(ClapParser)]
+#[command(name= "alv")]
+struct Cli {
+    /// Path to the .alv source file
+    input: Option<String>,
+}
+
 fn main() {
+    let cli = Cli::parse();
+
+    match cli.input {
+        Some(input) => run_file(&input),
+        None => repl()
+    } // clap handles "usage" for us on it's own
+}
+
+fn run_file(path: &str) {
+    let program = match std::fs::read_to_string(path) {
+        Ok(program) => program,
+        Err(error) => {
+            exit(-1); // TODO: something better
+        }
+    };
     let mut vm = VM::default();
+    let res = vm.interpret(input);
 
-    let mut c = Chunk::default();
-    
-    let cost = c.add_constant(1.2 as Value);
-    c.write_code(OPCODE::Constant as u8, 123);
-    c.write_code(cost as u8, 123);
+    match res {
+        Ok(()) => exit(0),
+        Err(IError::CompileError) => exit(65),
+        Err(IError::RuntimeError) => exit(70),
+    }
+}
 
-    let cost = c.add_constant(3.4 as Value);
-    c.write_code(OPCODE::Constant as u8, 123);
-    c.write_code(cost as u8, 123);
+fn repl() {
+    let mut input = String::new();
+    loop {
+        print!("> ");
 
-    c.write_code(OPCODE::Add as u8, 123);
+        io::stdin().read_line(&mut input).expect("Failed to read line");
+        println!();
 
-    let cost = c.add_constant(5.6 as Value);
-    c.write_code(OPCODE::Constant as u8, 123);
-    c.write_code(cost as u8, 123);
-
-    c.write_code(OPCODE::Divide as u8, 123);
-
-    c.write_code(OPCODE::Negate as u8, 123);
-
-    c.write_code(OPCODE::Return as u8, 123);
-
-    // dissassemble_chunk(&c, "test");
-
-    let _ = vm.run(&c);
+        let mut vm = VM::default();
+        let res = vm.interpret(&input);
+    }
 }

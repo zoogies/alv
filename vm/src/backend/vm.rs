@@ -3,6 +3,7 @@ use num_traits::FromPrimitive;
 use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
 use crate::value::*;
+use crate::compiler::*;
 
 const STACK_MAX: usize = 256;
 
@@ -52,6 +53,12 @@ impl VM {
 
     fn read_constant(&mut self, chunk: &Chunk) -> Value {
         chunk.constants[self.read_byte(chunk) as usize]
+    }
+
+    pub fn interpret(&mut self, input: &str) -> InterpretResult {
+        let comp = Compiler::default();
+
+        Ok(())
     }
 
     pub fn run(&mut self, chunk: &Chunk) -> InterpretResult {
