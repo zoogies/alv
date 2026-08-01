@@ -24,12 +24,13 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
 
     let Some(instr) = OPCODE::from_u8(chunk.code[offset]) else { panic!("Fuck you, Rust compiler!") };
     match instr {
-        OPCODE::Return => {
-            simple_instruction("OP_RETURN", offset)
-        },
-        OPCODE::Constant => {
-            constant_instruction("OP_CONSTANT", chunk, offset)
-        }
+        OPCODE::Return =>   simple_instruction("OP_RETURN", offset),
+        OPCODE::Constant => constant_instruction("OP_CONSTANT", chunk, offset),
+        OPCODE::Negate =>   simple_instruction("OP_NEGATE", offset),
+        OPCODE::Add =>      simple_instruction("OP_ADD", offset),
+        OPCODE::Subtract => simple_instruction("OP_SUBTRACT", offset),
+        OPCODE::Multiply => simple_instruction("OP_MULTIPLY", offset),
+        OPCODE::Divide =>   simple_instruction("OP_DIVIDE", offset),
     }
 }
 

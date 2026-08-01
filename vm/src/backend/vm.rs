@@ -55,6 +55,14 @@ impl VM {
     }
 
     pub fn run(&mut self, chunk: &Chunk) -> InterpretResult {
+        macro_rules! binary_op {
+            ($op:tt) => {{
+                let b = self.stack.pop();
+                let a = self.stack.pop();
+                self.stack.push(a $op b);
+            }};
+        }
+        
         self.ip = 0;
         
         loop {
@@ -79,7 +87,14 @@ impl VM {
                 OPCODE::Constant => {
                     let constant: Value = self.read_constant(chunk);
                     self.stack.push(constant);
-                    continue;
+                },
+                OPCODE::Add         =>  binary_op!(+),
+                OPCODE::Subtract    =>  binary_op!(-),
+                OPCODE::Multiply    =>  binary_op!(*),
+                OPCODE::Divide      =>  binary_op!(/),
+                OPCODE::Negate => {
+                    let v = -self.stack.pop();
+                    self.stack.push(v);
                 },
             }
         }

@@ -9,9 +9,23 @@ fn main() {
 
     let mut c = Chunk::default();
     
-    let cost = c.add_constant(0.000001 as Value);
+    let cost = c.add_constant(1.2 as Value);
     c.write_code(OPCODE::Constant as u8, 123);
     c.write_code(cost as u8, 123);
+
+    let cost = c.add_constant(3.4 as Value);
+    c.write_code(OPCODE::Constant as u8, 123);
+    c.write_code(cost as u8, 123);
+
+    c.write_code(OPCODE::Add as u8, 123);
+
+    let cost = c.add_constant(5.6 as Value);
+    c.write_code(OPCODE::Constant as u8, 123);
+    c.write_code(cost as u8, 123);
+
+    c.write_code(OPCODE::Divide as u8, 123);
+
+    c.write_code(OPCODE::Negate as u8, 123);
 
     c.write_code(OPCODE::Return as u8, 123);
 
