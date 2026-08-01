@@ -4,9 +4,34 @@ use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
 use crate::value::*;
 
+const STACK_MAX: usize = 256;
+
+#[derive(Default)]
+struct Stack {
+    stack: Vec<Value>,
+}
+
+impl Stack {
+    pub fn top(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn push(&mut self, v: Value) {
+        if self.stack.len() == STACK_MAX {
+            panic!("Stack overflow!")
+        }
+        self.stack.push(v);
+    }
+
+    pub fn pop(&mut self) -> Value {
+        self.stack.pop().expect("Tried to pop from empty stack!")
+    }
+}
+
 #[derive(Default)]
 pub struct VM {
-    ip: usize,
+    ip:     usize,
+    stack:  Stack,
 }
 
 pub enum IError {
@@ -34,18 +59,26 @@ impl VM {
         
         loop {
             if DEBUG_TRACE_EXECUTION {
+                print!("        ");
+                for v in &self.stack.stack {
+                    print!("[ ");
+                    print_value(v);
+                    print!(" ]");
+                }
+                println!();
                 dissassemble_instruction(chunk, self.ip);
             }
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
                 OPCODE::Return => {
+                    print_value(&self.stack.pop());
+                    println!();
                     return Ok(());
                 },
                 OPCODE::Constant => {
                     let constant: Value = self.read_constant(chunk);
-                    print_value(&constant);
-                    println!();
+                    self.stack.push(constant);
                     continue;
                 },
             }
