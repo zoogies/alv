@@ -1,4 +1,4 @@
-use crate::scanner::*;
+use crate::frontend::scanner::*;
 
 #[derive(Default)]
 pub struct Compiler {}

@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
 use crate::value::*;
-use crate::compiler::*;
+use crate::frontend::compiler::*;
 
 const STACK_MAX: usize = 256;
 
