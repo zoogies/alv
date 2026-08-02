@@ -14,6 +14,13 @@ pub enum OPCODE {
     Return,
 }
 
+impl From<OPCODE> for u8 {
+    fn from(op: OPCODE) -> Self {
+        op as u8
+    }
+}
+
+
 #[derive(Default)]
 pub struct Chunk {
     pub code:       Vec<u8>,
@@ -24,8 +31,8 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn write_code(&mut self, v: u8, line: u32) {
-        self.code.push(v);
+    pub fn write_code<T: Into<u8>>(&mut self, v: T, line: u32) {
+        self.code.push(v.into());
         self.lines.push(line);
     }
 

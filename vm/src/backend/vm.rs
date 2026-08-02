@@ -1,5 +1,6 @@
 use num_traits::FromPrimitive;
 
+use crate::common::*;
 use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
 use crate::value::*;
@@ -42,9 +43,6 @@ pub enum IError {
 
 pub type InterpretResult = Result<(), IError>;
 
-// I don't want to have to mentally think about cargo feature flags.
-const DEBUG_TRACE_EXECUTION: bool = true;
-
 impl VM {
     fn read_byte(&mut self, chunk: &Chunk) -> u8 {
         self.ip += 1;
@@ -56,12 +54,11 @@ impl VM {
     }
 
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
-        let comp = Compiler::default();
-
-        Ok(())
+        let chunk = Compiler::compile(input)?;
+        self.run(&chunk)
     }
 
-    pub fn run(&mut self, chunk: &Chunk) -> InterpretResult {
+    fn run(&mut self, chunk: &Chunk) -> InterpretResult {
         macro_rules! binary_op {
             ($op:tt) => {{
                 let b = self.stack.pop();

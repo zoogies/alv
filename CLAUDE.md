@@ -30,6 +30,9 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
 - Keep replies cohesive and textbook-like: do the reasoning and weighing of options in your
   head, then present the boiled-down, clear explanation. Push genuine nuance or alternative
   paths into brief footnotes rather than threading them through the main answer.
+- **Explanations must be simple and digestible first** (explicit request, 2026-08-02): clean
+  textbook prose, one idea at a time, short code examples when they aid comprehension. No
+  dense multi-concept walls — save depth for when he explicitly grills for details.
 - **Default to pointed, concise answers.** He'll explicitly ask when he wants a longer or more
   comprehensive treatment. Bias toward the tight answer that removes ambiguity over the
   comprehensive one that reintroduces it by being sprawling or vague. Retain agency to go long

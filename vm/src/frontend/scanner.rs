@@ -1,4 +1,4 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     LeftParen, RightParen,
     LeftBrace, RightBrace,
@@ -19,10 +19,11 @@ pub enum TokenType {
     EndFile, Error
 }
 
+#[derive(Clone,Copy)]
 pub struct Token<'src> {
-    slice:  &'src str,
-    ty:     TokenType,
-    line:   usize,
+    pub slice:  &'src str,
+    pub ty:     TokenType,
+    pub line:   usize,
 }
 
 impl<'src> Token<'src> {
@@ -61,7 +62,7 @@ impl<'src> Scanner<'src> {
         self.current >= self.src.len()
     }
 
-    fn make_token(&self, ty: TokenType) -> Token {
+    fn make_token(&self, ty: TokenType) -> Token<'src> {
         Token { slice: &self.src[self.start..self.current], ty: ty, line: self.line }
     }
 
@@ -110,7 +111,7 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    fn string(&mut self) -> Token {
+    fn string(&mut self) -> Token<'src> {
         while self.peek() != b'"' && !self.is_at_end() {
             if self.peek() == b'\n' { self.line += 1; }
             self.advance();
@@ -126,7 +127,7 @@ impl<'src> Scanner<'src> {
         char.is_ascii_digit()
     }
 
-    fn number(&mut self) -> Token {
+    fn number(&mut self) -> Token<'src> {
         while self.is_digit(&self.peek()) { self.advance(); }
 
         if self.peek() == b'.' && self.is_digit(&self.peek_next()) {
@@ -192,7 +193,7 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    fn identifier(&mut self) -> Token {
+    fn identifier(&mut self) -> Token<'src> {
         while self.is_alpha(&self.peek()) || self.is_digit(&self.peek()) {
             self.advance();
         }
@@ -200,7 +201,7 @@ impl<'src> Scanner<'src> {
         self.make_token(self.identifier_type())
     }
 
-    pub fn scan_token(&mut self) -> Token {
+    pub fn scan_token(&mut self) -> Token<'src> {
         self.skip_whitespace();
         self.start = self.current;
 

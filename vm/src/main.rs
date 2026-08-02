@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Write;
 use std::process::exit;
 
 use alv_vm::chunk::*;
@@ -32,7 +33,7 @@ fn run_file(path: &str) {
         }
     };
     let mut vm = VM::default();
-    let res = vm.interpret(input);
+    let res = vm.interpret(&program);
 
     match res {
         Ok(()) => exit(0),
@@ -45,11 +46,14 @@ fn repl() {
     let mut input = String::new();
     loop {
         print!("> ");
+        let _ = io::stdout().flush();
 
         io::stdin().read_line(&mut input).expect("Failed to read line");
         println!();
 
         let mut vm = VM::default();
         let res = vm.interpret(&input);
+
+        input.clear();
     }
 }
