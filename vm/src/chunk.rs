@@ -6,12 +6,19 @@ use crate::value::Value;
 #[derive(FromPrimitive)]
 pub enum OPCODE {
     Constant,
+    Nil,
+    True,
+    False,
+    Equal,
+    Greater,
+    Less,
     Add,
     Subtract,
     Multiply,
     Divide,
     Negate,
     Return,
+    Not,
 }
 
 impl From<OPCODE> for u8 {

@@ -134,31 +134,31 @@ impl<'src, 'c> Compiler<'src, 'c> {
             TokenType::Semicolon => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Slash => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Factor },
             TokenType::Star => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Factor },
-            TokenType::Bang => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::BangEqual => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::Bang => ParseRule { prefix: Some(Compiler::unary), infix: None, precedence: Precedence::None },
+            TokenType::BangEqual => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Equality },
             TokenType::Equal => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::EqualEqual => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::Greater => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::GreaterEqual => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::Less => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::LessEqual => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::EqualEqual => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Equality },
+            TokenType::Greater => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
+            TokenType::GreaterEqual => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
+            TokenType::Less => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
+            TokenType::LessEqual => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
             TokenType::Identifier => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Str => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Num => ParseRule { prefix: Some(Compiler::number), infix: None, precedence: Precedence::None },
             TokenType::And => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Class => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Else => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::False => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::False => ParseRule { prefix: Some(Compiler::literal), infix: None, precedence: Precedence::None },
             TokenType::For => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Fun => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::If => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::Nil => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::Nil => ParseRule { prefix: Some(Compiler::literal), infix: None, precedence: Precedence::None },
             TokenType::Or => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Print => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Return => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Super => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::This => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::True => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::True => ParseRule { prefix: Some(Compiler::literal), infix: None, precedence: Precedence::None },
             TokenType::Var => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::While => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Error => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
@@ -192,7 +192,22 @@ impl<'src, 'c> Compiler<'src, 'c> {
             TokenType::Minus => self.emit_byte(OPCODE::Subtract),
             TokenType::Star => self.emit_byte(OPCODE::Multiply),
             TokenType::Slash => self.emit_byte(OPCODE::Divide),
+            TokenType::BangEqual => self.emit_bytes(OPCODE::Equal, OPCODE::Not),
+            TokenType::EqualEqual => self.emit_byte(OPCODE::Equal),
+            TokenType::Greater => self.emit_byte(OPCODE::Greater),
+            TokenType::GreaterEqual => self.emit_bytes(OPCODE::Less, OPCODE::Not),
+            TokenType::Less => self.emit_byte(OPCODE::Less),
+            TokenType::LessEqual => self.emit_bytes(OPCODE::Greater, OPCODE::Not),
             _ => unreachable!()
+        }
+    }
+
+    fn literal(&mut self) {
+        match self.parser.previous.ty {
+            TokenType::False => self.emit_byte(OPCODE::False),
+            TokenType::Nil => self.emit_byte(OPCODE::Nil),
+            TokenType::True => self.emit_byte(OPCODE::True),
+            _ => { unreachable!() }
         }
     }
 
@@ -212,7 +227,8 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn number(&mut self) {
-        self.emit_constant(&self.parser.previous.slice.parse().unwrap());
+        let val: f64 = self.parser.previous.slice.parse().unwrap();
+        self.emit_constant(&Value::Number(val));
     }
 
     fn grouping(&mut self) {
@@ -227,6 +243,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
         match operator_ty {
             TokenType::Minus => self.emit_byte(OPCODE::Negate),
+            TokenType::Bang => self.emit_byte(OPCODE::Not),
             _ => return
         }
     }
