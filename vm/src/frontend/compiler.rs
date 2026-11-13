@@ -7,6 +7,7 @@ use crate::frontend::scanner::*;
 use crate::chunk::*;
 use crate::backend::vm::*;
 use crate::value::*;
+use crate::heap::*;
 
 struct Parser<'src> {
     current:    Token<'src>, 
@@ -19,6 +20,7 @@ pub struct Compiler<'src, 'c> {
     scanner:    Scanner<'src>,
     parser:     Parser<'src>,
     chunk:      &'c mut Chunk,
+    heap:       &'c mut Heap,
 }
 
 #[repr(u8)]
@@ -116,7 +118,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
         if DEBUG_PRINT_CODE {
             if !self.parser.had_error {
-                dissassemble_chunk(&self.chunk, "code");
+                dissassemble_chunk(&self.chunk, "code", self.heap);
             }
         }
     }
@@ -143,7 +145,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             TokenType::Less => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
             TokenType::LessEqual => ParseRule { prefix: None, infix: Some(Compiler::binary), precedence: Precedence::Comparison },
             TokenType::Identifier => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
-            TokenType::Str => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::Str => ParseRule { prefix: Some(Compiler::string), infix: None, precedence: Precedence::None },
             TokenType::Num => ParseRule { prefix: Some(Compiler::number), infix: None, precedence: Precedence::None },
             TokenType::And => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Class => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
@@ -211,6 +213,14 @@ impl<'src, 'c> Compiler<'src, 'c> {
         }
     }
 
+    fn string(&mut self) {       
+        let r = self.heap.alloc(Obj::String(Box::from(
+            &self.parser.previous.slice[1..self.parser.previous.slice.len() - 1]
+        )));
+        
+        self.emit_constant(&Value::Obj(r));
+    }
+
     fn make_constant(&mut self, v: &Value) -> u8 {
         let x = self.chunk.add_constant(*v);
         if x > u8::MAX as usize {
@@ -252,7 +262,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.parse_precendence(Precedence::Assignment);
     }
 
-    pub fn compile(source: &str) -> Result<Chunk, IError> {
+    pub fn compile(source: &str, heap: &mut Heap) -> Result<Chunk, IError> {
         let mut chunk = Chunk::default();
         let mut c = Compiler {
             scanner: Scanner::new(source),
@@ -263,6 +273,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
                 panic_mode: false,
             },
             chunk: &mut chunk,
+            heap: heap,
         };
 
         c.advance();

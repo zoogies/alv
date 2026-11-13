@@ -4,3 +4,4 @@ pub mod value;
 pub mod backend;
 pub mod frontend;
 pub mod common;
+pub mod heap;

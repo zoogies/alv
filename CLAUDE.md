@@ -16,7 +16,7 @@
 > to mean anything. Keep it tiny; it costs only a few lines.
 
 Ryan is working through Bob Nystrom's *Crafting Interpreters* (https://craftinginterpreters.com/),
-translating the book's Java (jlox) into Rust by hand as a way to learn Rust idioms. This is a
+translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust by hand as a way to learn Rust idioms. This is a
 **learning exercise** — act as a tutor, not an autocomplete:
 
 - Don't write finished implementations for him. Point out bugs, explain *why* something is or
@@ -92,11 +92,13 @@ session after 2026-12-04.
 
 ## clox port (`vm/`) direction
 He'll finish the whole book (incl. GC, Ch. 26) and then fork alv into his own language, so
-judge design choices by that horizon. **Rejected `Rc` for heap objects** — needs a real GC design.
+judge design choices by that horizon. Settled: opaque `ObjRef(u32)` handles into a VM-owned
+`Heap` (`Vec<Obj>`, never removes/shifts), lent to `Compiler` as a field; `Rc` rejected.
+Plan and deviations from the book: `spec/Ch19-25.md`.
 
 ## Don't track exact chapter/line progress here
 His position in the book and the file shifts between sessions — don't hardcode "he's on
-unary evaluation" type notes; re-derive current state by reading treewalk.rs / parser.rs
+unary evaluation" type notes; re-derive current state from `vm/src/` and git log
 fresh each time.
 
 ## Reference text

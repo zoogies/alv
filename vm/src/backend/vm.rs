@@ -6,6 +6,7 @@ use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
 use crate::value::*;
 use crate::frontend::compiler::*;
+use crate::heap::*;
 
 const STACK_MAX: usize = 256;
 
@@ -43,6 +44,7 @@ impl Stack {
 pub struct VM {
     ip:     usize,
     stack:  Stack,
+    heap:   Heap,
 }
 
 pub enum IError {
@@ -60,11 +62,16 @@ fn is_falsey(v: Value) -> bool {
     }
 }
 
-fn values_equal(a: Value, b: Value) -> bool {
+fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
     match (a, b) {
         (Value::Bool(a), Value::Bool(b)) => a == b,
         (Value::Number(a), Value::Number(b)) => a == b,
         (Value::Nil, Value::Nil) => true,
+        (Value::Obj(a), Value::Obj(b)) => {
+            match (heap.get(a), heap.get(b)) {
+                (Obj::String(a), Obj::String(b)) => a == b,
+            }
+        }
         _ => false,
     }
 }
@@ -87,7 +94,7 @@ impl VM {
     }
 
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
-        let chunk = Compiler::compile(input)?;
+        let chunk = Compiler::compile(input, &mut self.heap)?;
         self.run(&chunk)
     }
 
@@ -115,17 +122,17 @@ impl VM {
                 print!("        ");
                 for v in &self.stack.stack {
                     print!("[ ");
-                    print_value(v);
+                    print_value(v, &self.heap);
                     print!(" ]");
                 }
                 println!();
-                dissassemble_instruction(chunk, self.ip);
+                dissassemble_instruction(chunk, self.ip, &self.heap);
             }
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
                 OPCODE::Return => {
-                    print_value(&self.stack.pop());
+                    print_value(&self.stack.pop(), &self.heap);
                     println!();
                     return Ok(());
                 },
@@ -140,7 +147,32 @@ impl VM {
                     let &v = &self.stack.pop();
                     self.stack.push(Value::Bool(is_falsey(v)))
                 },
-                OPCODE::Add         =>  binary_op!(Value::Number, +),
+                OPCODE::Add => {
+                    match (self.stack.peek(0), self.stack.peek(1)) {
+                        (Value::Obj(a), Value::Obj(b)) => {
+                            match (self.heap.get(a), self.heap.get(b)) {
+                                (Obj::String(a), Obj::String(b)) => {
+                                    let r = self.heap.alloc(Obj::String(Box::from(
+                                        format!("{b}{a}")
+                                    )));
+                                    
+                                    self.stack.pop();
+                                    self.stack.pop();
+                                    self.stack.push(Value::Obj(r));
+                                }
+                            }
+                        },
+                        (Value::Number(a), Value::Number(b)) => {
+                            self.stack.pop();
+                            self.stack.pop();
+                            self.stack.push(Value::Number(a + b));
+                        }
+                        _ => {
+                            self.runtime_error("Operands must be two numbers or two strings.", chunk);
+                            return Err(RuntimeError);
+                        }
+                    }
+                } 
                 OPCODE::Subtract    =>  binary_op!(Value::Number, -),
                 OPCODE::Multiply    =>  binary_op!(Value::Number, *),
                 OPCODE::Divide      =>  binary_op!(Value::Number, /),
@@ -160,7 +192,7 @@ impl VM {
                 OPCODE::Equal => {
                     let a = self.stack.pop();
                     let b = self.stack.pop();
-                    self.stack.push(Value::Bool(values_equal(a, b)))
+                    self.stack.push(Value::Bool(values_equal(a, b, &self.heap)))
                 },
                 OPCODE::Greater => binary_op!(Value::Bool, >),
                 OPCODE::Less => binary_op!(Value::Bool, <),

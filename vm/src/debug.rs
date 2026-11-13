@@ -2,16 +2,17 @@ use num_traits::FromPrimitive;
 
 use crate::chunk::*;
 use crate::value::*;
+use crate::heap::*;
 
-pub fn dissassemble_chunk(chunk: &Chunk, name: &str) {
+pub fn dissassemble_chunk(chunk: &Chunk, name: &str, heap: &Heap) {
     println!("== {name} ==");
     let mut offset: usize = 0;
     while offset < chunk.code.len() {
-        offset = dissassemble_instruction(chunk, offset);
+        offset = dissassemble_instruction(chunk, offset, heap);
     }
 }
 
-pub fn dissassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
+pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> usize {
     print!("{:04} ", offset);
 
     // lineno
@@ -25,7 +26,7 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize) -> usize {
     let Some(instr) = OPCODE::from_u8(chunk.code[offset]) else { panic!("Fuck you, Rust compiler!") };
     match instr {
         OPCODE::Return =>   simple_instruction("OP_RETURN", offset),
-        OPCODE::Constant => constant_instruction("OP_CONSTANT", chunk, offset),
+        OPCODE::Constant => constant_instruction("OP_CONSTANT", chunk, offset, heap),
         OPCODE::Negate =>   simple_instruction("OP_NEGATE", offset),
         OPCODE::Add =>      simple_instruction("OP_ADD", offset),
         OPCODE::Subtract => simple_instruction("OP_SUBTRACT", offset),
@@ -46,10 +47,10 @@ fn simple_instruction(name: &str, offset: usize) -> usize {
     offset + 1
 }
 
-fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+fn constant_instruction(name: &str, chunk: &Chunk, offset: usize, heap: &Heap) -> usize {
     let constant = chunk.code[offset + 1];
     print!("{:<16} {:>4} '", name, constant);
-    print_value(&chunk.constants[constant as usize]);
+    print_value(&chunk.constants[constant as usize], heap);
     print!("'\n");
     offset + 2
 }
