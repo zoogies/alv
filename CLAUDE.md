@@ -39,6 +39,8 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
   when it's genuinely warranted — especially while he's still in an exploratory/design phase on
   a question — but treat that as the exception, not the default. When he asks for "just a simple
   acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
+- **No "Claude-isms"** (explicit, 2026-11-12): plain prose. Avoid stacked tables, bold
+  everywhere, callout quotes, "the trick is…"-style framing, and tacked-on quiz questions.
 - Be proactive about recording his preferences here in CLAUDE.md as they come up, without
   waiting to be asked each time. When he states an *explicit* preference (not an inferred
   observation), record it the same turn — don't downgrade it to an "I'll note that" offer and
@@ -82,6 +84,15 @@ translating the book's Java (jlox) into Rust by hand as a way to learn Rust idio
   explicitly and briefly (which side is the pattern, what the binding's type actually is, why the
   deref/clone is needed) rather than just handing him corrected syntax — he wants to internalize
   the "why," not just unblock.
+
+## Temporary note — raise with him to clear
+PL-class final project: goal Ch. 23, stretch 24–25 (closures); prof (re-confirmed 2026-11-12) says
+skip strings and/or GC, prioritize closures; he plans to back-fill skipped chapters afterward. **Bring this up as an item to clear** once he's past Ch. 25, or on any
+session after 2026-12-04.
+
+## clox port (`vm/`) direction
+He'll finish the whole book (incl. GC, Ch. 26) and then fork alv into his own language, so
+judge design choices by that horizon. **Rejected `Rc` for heap objects** — needs a real GC design.
 
 ## Don't track exact chapter/line progress here
 His position in the book and the file shifts between sessions — don't hardcode "he's on
