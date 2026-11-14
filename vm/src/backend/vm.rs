@@ -1,4 +1,5 @@
 use num_traits::FromPrimitive;
+use rustc_hash::FxHashMap;
 
 use crate::backend::vm::IError::RuntimeError;
 use crate::common::*;
@@ -42,9 +43,10 @@ impl Stack {
 
 #[derive(Default)]
 pub struct VM {
-    ip:     usize,
-    stack:  Stack,
-    heap:   Heap,
+    ip:         usize,
+    stack:      Stack,
+    heap:       Heap,
+    globals:    FxHashMap<Box<str>, Value>,
 }
 
 pub enum IError {
@@ -93,6 +95,13 @@ impl VM {
         chunk.constants[self.read_byte(chunk) as usize]
     }
 
+    fn read_string(&mut self, chunk: &Chunk) -> ObjRef {
+        match chunk.constants[self.read_byte(chunk) as usize] {
+            Value::Obj(o) => o,
+            _ => panic!("wtf")
+        }
+    }
+
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
         let chunk = Compiler::compile(input, &mut self.heap)?;
         self.run(&chunk)
@@ -131,9 +140,40 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
-                OPCODE::Return => {
+                OPCODE::SetGlobal => {
+                    let h = self.read_string(chunk);
+                    let r = self.heap.get_str(h);
+
+                    let Some(g) = self.globals.get_mut(r) else {
+                        self.runtime_error(&format!("Undefined variable '{}'.", r), chunk);
+                        return Err(RuntimeError);
+                    };
+
+                    *g = self.stack.peek(0);
+                },
+                OPCODE::DefineGlobal => {
+                    let h = self.read_string(chunk);
+                    let r = self.heap.get_str(h);
+                    self.globals.insert(r.into(), self.stack.peek(0));
+                    self.stack.pop();
+                },
+                OPCODE::GetGlobal => {
+                    let h = self.read_string(chunk);
+                    let r = self.heap.get_str(h);
+                    let Some(g) = self.globals.get(r) else {
+                        self.runtime_error(&format!("Undefined variable '{}'.", r), chunk);
+                        return Err(RuntimeError);
+                    };
+                    self.stack.push(*g);
+                },
+                OPCODE::Pop => {
+                    self.stack.pop();
+                }
+                OPCODE::Print => {
                     print_value(&self.stack.pop(), &self.heap);
                     println!();
+                },
+                OPCODE::Return => {
                     return Ok(());
                 },
                 OPCODE::Constant => {
@@ -152,9 +192,7 @@ impl VM {
                         (Value::Obj(a), Value::Obj(b)) => {
                             match (self.heap.get(a), self.heap.get(b)) {
                                 (Obj::String(a), Obj::String(b)) => {
-                                    let r = self.heap.alloc(Obj::String(Box::from(
-                                        format!("{b}{a}")
-                                    )));
+                                    let r = self.heap.alloc_string(format!("{b}{a}"));
                                     
                                     self.stack.pop();
                                     self.stack.pop();

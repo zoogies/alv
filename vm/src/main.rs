@@ -44,6 +44,8 @@ fn run_file(path: &str) {
 
 fn repl() {
     let mut input = String::new();
+    let mut vm = VM::default();
+
     loop {
         print!("> ");
         let _ = io::stdout().flush();
@@ -51,7 +53,6 @@ fn repl() {
         io::stdin().read_line(&mut input).expect("Failed to read line");
         println!();
 
-        let mut vm = VM::default();
         let res = vm.interpret(&input);
 
         input.clear();

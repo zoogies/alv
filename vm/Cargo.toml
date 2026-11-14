@@ -7,3 +7,4 @@ edition = "2024"
 clap = { version = "4.6.5", features = ["derive"] }
 num-derive = "0.5.1"
 num-traits = "0.2.19"
+rustc-hash = "2.1.3"

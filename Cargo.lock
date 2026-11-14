@@ -17,6 +17,7 @@ dependencies = [
  "clap",
  "num-derive",
  "num-traits",
+ "rustc-hash",
 ]
 
 [[package]]

@@ -19,6 +19,11 @@ pub enum OPCODE {
     Negate,
     Return,
     Not,
+    Print,
+    Pop,
+    DefineGlobal,
+    GetGlobal,
+    SetGlobal,
 }
 
 impl From<OPCODE> for u8 {
