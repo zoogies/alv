@@ -33,7 +33,8 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
 - **Explanations must be simple and digestible first** (explicit request, 2026-08-02): clean
   textbook prose, one idea at a time, short code examples when they aid comprehension. No
   dense multi-concept walls — save depth for when he explicitly grills for details.
-- **Default to pointed, concise answers.** He'll explicitly ask when he wants a longer or more
+- **Default to pointed, concise answers.** He often skims replies (said 2026-11-16), so lead
+  with the verdict/bug and keep the rest short. He'll explicitly ask when he wants a longer or more
   comprehensive treatment. Bias toward the tight answer that removes ambiguity over the
   comprehensive one that reintroduces it by being sprawling or vague. Retain agency to go long
   when it's genuinely warranted — especially while he's still in an exploratory/design phase on

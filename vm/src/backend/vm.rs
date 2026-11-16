@@ -39,6 +39,14 @@ impl Stack {
     pub fn reset(&mut self) {
         self.stack.clear();
     }
+
+    pub fn get(&self, slot: usize) -> Value {
+        self.stack[slot]
+    }
+
+    pub fn set(&mut self, slot: usize, value: Value) {
+        self.stack[slot] = value
+    }
 }
 
 #[derive(Default)]
@@ -140,6 +148,14 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
+                OPCODE::GetLocal => {
+                    let slot = self.read_byte(chunk);
+                    self.stack.push(self.stack.get(slot as usize));
+                },
+                OPCODE::SetLocal => {
+                    let slot = self.read_byte(chunk);
+                    self.stack.set(slot as usize, self.stack.peek(0))
+                },
                 OPCODE::SetGlobal => {
                     let h = self.read_string(chunk);
                     let r = self.heap.get_str(h);

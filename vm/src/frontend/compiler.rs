@@ -16,11 +16,18 @@ struct Parser<'src> {
     panic_mode: bool,
 }
 
+pub struct Local<'src> {
+    name: &'src str,    // no need for token because we report errors using parser lineno
+    depth: Option<u32>, // may or may not be initialized. u32 is arbitrary, needs to be large for edge case weird depths {{{{{...{x}...}}}}}
+}
+
 pub struct Compiler<'src, 'c> {
-    scanner:    Scanner<'src>,
-    parser:     Parser<'src>,
-    chunk:      &'c mut Chunk,
-    heap:       &'c mut Heap,
+    scanner:        Scanner<'src>,
+    parser:         Parser<'src>,
+    chunk:          &'c mut Chunk,
+    heap:           &'c mut Heap,
+    locals:         Vec<Local<'src>>,
+    scope_depth:    u32,
 }
 
 #[repr(u8)]
@@ -201,14 +208,57 @@ impl<'src, 'c> Compiler<'src, 'c> {
         }
     }
     
+    fn mark_initialized(&mut self) {
+        self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+    }
+    
     fn parse_variable(&mut self, msg: &str) -> u8 {
         self.consume(TokenType::Identifier, msg);
+
+        self.declare_variable();
+        if self.scope_depth > 0 { return 0 }
+
         self.identifier_constant(self.parser.previous.slice)
     }
 
     fn define_variable(&mut self, global: u8) {
+        if self.scope_depth > 0 {
+            self.mark_initialized();
+            return
+        }
+        
         self.emit_byte(OPCODE::DefineGlobal);
         self.emit_byte(global);
+    }
+
+    fn declare_variable(&mut self) {
+        if self.scope_depth == 0 { return }
+
+        let name = self.parser.previous.slice;
+
+        let dup = self.locals
+            .iter()
+            .rev()
+            .take_while(|l| l.depth.is_some_and(|l| l == self.scope_depth ))
+            .any(|l| l.name == name);
+
+        if dup {
+            self.error("Already a variable with this name in this scope.");
+        }
+
+        self.add_local(name);
+    }
+
+    fn add_local(&mut self, name: &'src str) {
+        if self.locals.len() == u8::MAX as usize + 1 {
+            self.error("Too many local variables in function.");
+            return;
+        }
+
+        self.locals.push(Local {
+            depth: None,
+            name: name,
+        });
     }
 
     fn identifier_constant(&mut self, name: &str) -> u8 {
@@ -257,16 +307,31 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.named_variable(self.parser.previous.slice, can_assign);
     }
 
+    fn resolve_local(&mut self, name: &str) -> Option<u8> {
+        let i = self.locals
+            .iter()
+            .rposition(|x| x.name == name)?;
+
+        if self.locals[i].depth.is_none() {
+            self.error("Can't read local variable in its own initializer.");
+        }
+
+        Some(i as u8)
+    }
+
     fn named_variable(&mut self, name: &str, can_assign: bool) {
-        let arg = self.identifier_constant(name);
+        let (get_op, set_op, arg) = match self.resolve_local(name) {
+            Some(slot) => (OPCODE::GetLocal, OPCODE::SetLocal, slot),
+            None => (OPCODE::GetGlobal, OPCODE::SetGlobal, self.identifier_constant(name))
+        };
 
         if can_assign && self.match_token(TokenType::Equal) {
             self.expression();
-            self.emit_byte(OPCODE::SetGlobal);
+            self.emit_byte(set_op);
             self.emit_byte(arg);
         }
         else {
-            self.emit_byte(OPCODE::GetGlobal);
+            self.emit_byte(get_op);
             self.emit_byte(arg);
         }
     }
@@ -338,9 +403,36 @@ impl<'src, 'c> Compiler<'src, 'c> {
         if self.parser.panic_mode { self.synchronize(); }
     }
 
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+        let sd = self.scope_depth;
+
+        while self.locals.last().is_some_and(|l| l.depth.is_some_and(|d| d > sd)) {
+            self.locals.pop();
+            self.emit_byte(OPCODE::Pop);
+        }
+    }
+
+    fn block(&mut self) {
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::EndFile) {
+            self.declaration();
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.");
+    }
+
     fn statement(&mut self) {
         if self.match_token(TokenType::Print) {
             self.print_statement();
+        }
+        else if self.match_token(TokenType::LeftBrace) {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
         }
         else {
             self.expression_statement();
@@ -394,6 +486,8 @@ impl<'src, 'c> Compiler<'src, 'c> {
             },
             chunk: &mut chunk,
             heap: heap,
+            locals: Vec::new(),
+            scope_depth: 0,
         };
 
         c.advance();

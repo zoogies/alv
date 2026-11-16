@@ -44,6 +44,8 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> us
         OPCODE::DefineGlobal => constant_instruction("OP_DEFINE_GLOBAL", chunk, offset, heap),
         OPCODE::GetGlobal =>    constant_instruction("OP_GET_GLOBAL", chunk, offset, heap),
         OPCODE::SetGlobal =>    constant_instruction("OP_SET_GLOBAL", chunk, offset, heap),
+        OPCODE::GetLocal =>     byte_instruction("OP_GET_LOCAL", chunk, offset), 
+        OPCODE::SetLocal =>     byte_instruction("OP_SET_LOCAL", chunk, offset), 
     }
 }
 
@@ -57,5 +59,11 @@ fn constant_instruction(name: &str, chunk: &Chunk, offset: usize, heap: &Heap) -
     print!("{:<16} {:>4} '", name, constant);
     print_value(&chunk.constants[constant as usize], heap);
     print!("'\n");
+    offset + 2
+}
+
+fn byte_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
+    let slot = chunk.code[offset + 1];
+    print!("{:<16} {:>4} '", name, slot);
     offset + 2
 }
