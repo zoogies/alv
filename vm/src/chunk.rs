@@ -26,6 +26,8 @@ pub enum OPCODE {
     SetGlobal,
     GetLocal,
     SetLocal,
+    JumpIfFalse,
+    Jump,
 }
 
 impl From<OPCODE> for u8 {

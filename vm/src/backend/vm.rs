@@ -103,6 +103,10 @@ impl VM {
         chunk.constants[self.read_byte(chunk) as usize]
     }
 
+    fn read_short(&mut self, chunk: &Chunk) -> u16 {
+        u16::from_be_bytes([self.read_byte(chunk),self.read_byte(chunk)])
+    }
+
     fn read_string(&mut self, chunk: &Chunk) -> ObjRef {
         match chunk.constants[self.read_byte(chunk) as usize] {
             Value::Obj(o) => o,
@@ -148,6 +152,16 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
+                OPCODE::Jump => {
+                    let offset = self.read_short(chunk) as usize;
+                    self.ip += offset;
+                },
+                OPCODE::JumpIfFalse => {
+                    let offset = self.read_short(chunk) as usize;
+                    if is_falsey(self.stack.peek(0)) {
+                        self.ip += offset;
+                    }
+                },
                 OPCODE::GetLocal => {
                     let slot = self.read_byte(chunk);
                     self.stack.push(self.stack.get(slot as usize));

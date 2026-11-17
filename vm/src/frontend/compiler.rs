@@ -164,7 +164,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             TokenType::Identifier => ParseRule { prefix: Some(Compiler::variable), infix: None, precedence: Precedence::None },
             TokenType::Str => ParseRule { prefix: Some(Compiler::string), infix: None, precedence: Precedence::None },
             TokenType::Num => ParseRule { prefix: Some(Compiler::number), infix: None, precedence: Precedence::None },
-            TokenType::And => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::And => ParseRule { prefix: Some(Compiler::and), infix: None, precedence: Precedence::And },
             TokenType::Class => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Else => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::False => ParseRule { prefix: Some(Compiler::literal), infix: None, precedence: Precedence::None },
@@ -172,7 +172,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             TokenType::Fun => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::If => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Nil => ParseRule { prefix: Some(Compiler::literal), infix: None, precedence: Precedence::None },
-            TokenType::Or => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
+            TokenType::Or => ParseRule { prefix: Some(Compiler::or), infix: None, precedence: Precedence::Or },
             TokenType::Print => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Return => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::Super => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
@@ -356,6 +356,25 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.emit_constant(&Value::Number(val));
     }
 
+    fn and(&mut self, _can_assign: bool) {
+        let end_jump = self.emit_jump(OPCODE::JumpIfFalse as u8);
+        self.emit_byte(OPCODE::Pop);
+        self.parse_precedence(Precedence::And);
+
+        self.patch_jump(end_jump);
+    }
+
+    fn or(&mut self, _can_assign: bool) {
+        let else_jump = self.emit_jump(OPCODE::JumpIfFalse as u8);
+        let end_jump = self.emit_jump(OPCODE::Jump as u8);
+        
+        self.patch_jump(else_jump);
+        self.emit_byte(OPCODE::Pop as u8);
+
+        self.parse_precedence(Precedence::Or);
+        self.patch_jump(end_jump);
+    }
+
     fn grouping(&mut self, _can_assign: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
@@ -429,6 +448,9 @@ impl<'src, 'c> Compiler<'src, 'c> {
         if self.match_token(TokenType::Print) {
             self.print_statement();
         }
+        else if self.match_token(TokenType::If) {
+            self.if_statement();
+        }
         else if self.match_token(TokenType::LeftBrace) {
             self.begin_scope();
             self.block();
@@ -437,6 +459,46 @@ impl<'src, 'c> Compiler<'src, 'c> {
         else {
             self.expression_statement();
         }
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+    
+        let then_jump = self.emit_jump(OPCODE::JumpIfFalse as u8);
+        self.emit_byte(OPCODE::Pop);
+        self.statement();
+
+        let else_jump = self.emit_jump(OPCODE::Jump as u8);
+
+        self.patch_jump(then_jump);
+        self.emit_byte(OPCODE::Pop);
+    
+        if self.match_token(TokenType::Else) {
+            self.statement();
+        }
+
+        self.patch_jump(else_jump);
+    }
+
+    fn emit_jump(&mut self, instr: u8) -> usize {
+        self.emit_byte(instr);
+        self.emit_byte(0xff);
+        self.emit_byte(0xff);
+
+        self.chunk.code.len() - 2
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        let jump = self.chunk.code.len() - offset - 2;
+
+        if jump > u16::MAX as usize {
+            self.error("Too much code to jump over.");
+        }
+
+        self.chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
+        self.chunk.code[offset + 1] = (jump & 0xff) as u8;
     }
 
     fn print_statement(&mut self) {

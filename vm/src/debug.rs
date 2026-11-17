@@ -46,6 +46,8 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> us
         OPCODE::SetGlobal =>    constant_instruction("OP_SET_GLOBAL", chunk, offset, heap),
         OPCODE::GetLocal =>     byte_instruction("OP_GET_LOCAL", chunk, offset), 
         OPCODE::SetLocal =>     byte_instruction("OP_SET_LOCAL", chunk, offset), 
+        OPCODE::Jump =>         jump_instruction("OP_JUMP", 1, chunk, offset),
+        OPCODE::JumpIfFalse =>  jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset),
     }
 }
 
@@ -64,6 +66,12 @@ fn constant_instruction(name: &str, chunk: &Chunk, offset: usize, heap: &Heap) -
 
 fn byte_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
     let slot = chunk.code[offset + 1];
-    print!("{:<16} {:>4} '", name, slot);
+    println!("{:<16} {:>4}", name, slot);
     offset + 2
+}
+
+fn jump_instruction(name: &str, sign: isize, chunk: &Chunk, offset: usize) -> usize {
+    let jump= u16::from_be_bytes([chunk.code[offset + 1], chunk.code[offset + 2]]) as usize;
+    println!("{:<16} {:>4} -> {}", name, offset, (offset as isize) + 3 + sign * (jump as isize));
+    offset + 3
 }
