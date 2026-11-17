@@ -9,3 +9,7 @@ tracking easy optimization targets rn:
 "When multiple local variables go out of scope at once, you get a series of OP_POP instructions that get interpreted one at a time. A simple optimization you could add to your Lox implementation is a specialized OP_POPN instruction that takes an operand for the number of slots to pop and pops them all at once."
 
 - give or and and dedicated opcodes/instructions
+
+personal ideas:
+- loop unrolling?
+- can always go look at llvm for ideas for passes

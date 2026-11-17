@@ -2,9 +2,6 @@ use std::io;
 use std::io::Write;
 use std::process::exit;
 
-use alv_vm::chunk::*;
-use alv_vm::debug::*;
-use alv_vm::value::*;
 use alv_vm::backend::vm::*;
 
 use clap::Parser as ClapParser;
@@ -28,7 +25,7 @@ fn main() {
 fn run_file(path: &str) {
     let program = match std::fs::read_to_string(path) {
         Ok(program) => program,
-        Err(error) => {
+        Err(_error) => {
             exit(-1); // TODO: something better
         }
     };
@@ -53,7 +50,7 @@ fn repl() {
         io::stdin().read_line(&mut input).expect("Failed to read line");
         println!();
 
-        let res = vm.interpret(&input);
+        let _res = vm.interpret(&input);
 
         input.clear();
     }

@@ -17,9 +17,10 @@ struct Stack {
 }
 
 impl Stack {
-    pub fn top(&self) -> usize {
-        self.stack.len()
-    }
+    // TODO: removeme? maybe there are places we should use this? i have written this expr a lot
+    // pub fn top(&self) -> usize {
+    //     self.stack.len()
+    // }
 
     pub fn push(&mut self, v: Value) {
         if self.stack.len() == STACK_MAX {
@@ -152,6 +153,10 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
             match op {
+                OPCODE::Loop => {
+                    let offset = self.read_short(chunk);
+                    self.ip -= offset as usize;
+                },
                 OPCODE::Jump => {
                     let offset = self.read_short(chunk) as usize;
                     self.ip += offset;

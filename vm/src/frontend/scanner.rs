@@ -27,7 +27,7 @@ pub struct Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    pub fn error(str: &'src str, line: usize) -> Token {
+    pub fn error(str: &'src str, line: usize) -> Token<'src> {
         Self {
             slice: str,
             ty: TokenType::Error,
