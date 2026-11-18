@@ -5,6 +5,7 @@ use crate::chunk::Chunk;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ObjRef(u32);
 
+#[derive(PartialEq)]
 pub enum FunctionType {
     Function,
     Script,

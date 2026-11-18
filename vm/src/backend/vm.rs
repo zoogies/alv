@@ -202,7 +202,7 @@ impl VM {
                 OPCODE::GetLocal => {
                     let slot = self.read_byte();
                     let base = self.frame().slots;
-                    self.stack.push(self.stack.get(slot as usize));
+                    self.stack.push(self.stack.get(base + slot as usize));
                 },
                 OPCODE::SetLocal => {
                     let slot = self.read_byte();

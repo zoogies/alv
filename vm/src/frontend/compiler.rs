@@ -231,6 +231,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
     
     fn mark_initialized(&mut self) {
+        if self.current().scope_depth == 0 { return }
         self.current().locals.last_mut().unwrap().depth = Some(self.current().scope_depth);
     }
     
@@ -419,6 +420,13 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.parse_precedence(Precedence::Assignment);
     }
 
+    fn fun_declaration(&mut self) {
+        let global = self.parse_variable("Expect function name.");
+        self.mark_initialized();
+        self.function(FunctionType::Function);
+        self.define_variable(global);
+    }
+
     fn var_declaration(&mut self) {
         let global: u8 = self.parse_variable("Expect variable name.");
 
@@ -435,7 +443,10 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn declaration(&mut self) {
-        if self.match_token(TokenType::Var) {
+        if self.match_token(TokenType::Fun) {
+            self.fun_declaration();
+        }
+        else if self.match_token(TokenType::Var) {
             self.var_declaration();
         }
         else {
@@ -465,6 +476,38 @@ impl<'src, 'c> Compiler<'src, 'c> {
         }
 
         self.consume(TokenType::RightBrace, "Expect '}' after block.");
+    }
+
+    fn function(&mut self, ty: FunctionType) {
+        self.init_compiler(ty);
+        self.begin_scope();
+
+        self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+        
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if self.current().function.arity == u8::MAX {
+                    self.error_at_current("Can't have more than 255 parameters.");
+                }
+                else {
+                    self.current().function.arity += 1;
+                }
+
+                let constant = self.parse_variable("Expect parameter name.");
+                self.define_variable(constant);
+    
+                if !self.match_token(TokenType::Comma) { break }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.");
+        self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+        self.block();
+
+        let function = self.end_compiler();
+        let c = self.make_constant(&Value::Obj(function));
+        self.emit_byte(OPCODE::Constant);
+        self.emit_byte(c);
     }
 
     fn statement(&mut self) {
@@ -638,9 +681,14 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn init_compiler(&mut self, fn_type: FunctionType) {
+        let mut f = Function::default();
+        if fn_type != FunctionType::Script {
+            f.name = Some(self.parser.previous.slice.into());
+        }
+        
         self.states.push(FunctionState {
             fn_type,
-            function: Function::default(),
+            function: f,
             locals: vec![Local {
                 name: "",
                 depth: Some(0),

@@ -40,6 +40,9 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
   when it's genuinely warranted — especially while he's still in an exploratory/design phase on
   a question — but treat that as the exception, not the default. When he asks for "just a simple
   acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
+- **Verify, don't delegate checks** (2026-11-18): never say "double-check X"; read the code
+  myself and only mention it if it's wrong. Every actionable item gets `file:line` plus the
+  surrounding snippet so he can find it without hunting.
 - **No "Claude-isms"** (explicit, 2026-11-12): plain prose. Avoid stacked tables, bold
   everywhere, callout quotes, "the trick is…"-style framing, and tacked-on quiz questions.
   Same for visuals I make him (2026-11-17): no taglines or written copy, just numbers and data labels.
