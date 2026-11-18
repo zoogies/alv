@@ -21,13 +21,18 @@ pub struct Local<'src> {
     depth: Option<u32>, // may or may not be initialized. u32 is arbitrary, needs to be large for edge case weird depths {{{{{...{x}...}}}}}
 }
 
-pub struct Compiler<'src, 'c> {
-    scanner:        Scanner<'src>,
-    parser:         Parser<'src>,
-    chunk:          &'c mut Chunk,
-    heap:           &'c mut Heap,
+pub struct FunctionState<'src> {
+    function:       Function,
+    fn_type:        FunctionType,
     locals:         Vec<Local<'src>>,
     scope_depth:    u32,
+}
+
+pub struct Compiler<'src, 'c> {
+    scanner:    Scanner<'src>,
+    parser:     Parser<'src>,
+    heap:       &'c mut Heap,
+    states:     Vec<FunctionState<'src>>,
 }
 
 #[repr(u8)]
@@ -59,6 +64,14 @@ struct ParseRule<'src, 'c> {
 }
 
 impl<'src, 'c> Compiler<'src, 'c> {
+
+    fn current(&mut self) -> &mut FunctionState<'src> {
+        self.states.last_mut().expect("Tried to access current() when there are zero states.")
+    }
+
+    fn current_chunk(&mut self) -> &mut Chunk {
+        &mut self.current().function.chunk
+    }
 
     fn error_at_current(&mut self, msg: &str) {
         let cur = self.parser.current;
@@ -118,7 +131,8 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn emit_byte<T: Into<u8>>(&mut self, byte: T) {
-        self.chunk.write_code(byte, self.parser.previous.line as u32);
+        let pl = self.parser.previous.line;
+        self.current_chunk().write_code(byte, pl as u32);
     }
 
     fn emit_bytes<T: Into<u8>>(&mut self, one: T, two: T) {
@@ -130,14 +144,22 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.emit_byte(OPCODE::Return);
     }
 
-    fn end_compiler(&mut self) {
+    fn end_compiler(&mut self) -> ObjRef {
         self.emit_return();
+
+        let state = self.states.pop().expect("Ended compilation without a single state.");
 
         if DEBUG_PRINT_CODE {
             if !self.parser.had_error {
-                dissassemble_chunk(&self.chunk, "code", self.heap);
+                dissassemble_chunk(
+                    &state.function.chunk,
+                    state.function.name.as_deref().unwrap_or("<script>"),
+                    self.heap
+                );
             }
         }
+
+        self.heap.alloc(Obj::Function(state.function))
     }
 
     fn get_rule(&self, ty: TokenType) -> ParseRule<'src, 'c> {
@@ -209,20 +231,20 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
     
     fn mark_initialized(&mut self) {
-        self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+        self.current().locals.last_mut().unwrap().depth = Some(self.current().scope_depth);
     }
     
     fn parse_variable(&mut self, msg: &str) -> u8 {
         self.consume(TokenType::Identifier, msg);
 
         self.declare_variable();
-        if self.scope_depth > 0 { return 0 }
+        if self.current().scope_depth > 0 { return 0 }
 
         self.identifier_constant(self.parser.previous.slice)
     }
 
     fn define_variable(&mut self, global: u8) {
-        if self.scope_depth > 0 {
+        if self.current().scope_depth > 0 {
             self.mark_initialized();
             return
         }
@@ -232,14 +254,15 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn declare_variable(&mut self) {
-        if self.scope_depth == 0 { return }
+        if self.current().scope_depth == 0 { return }
 
         let name = self.parser.previous.slice;
+        let sd = self.current().scope_depth;
 
-        let dup = self.locals
+        let dup = self.current().locals
             .iter()
             .rev()
-            .take_while(|l| l.depth.is_some_and(|l| l == self.scope_depth ))
+            .take_while(|l| l.depth.is_some_and(|l| l == sd ))
             .any(|l| l.name == name);
 
         if dup {
@@ -250,12 +273,12 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn add_local(&mut self, name: &'src str) {
-        if self.locals.len() == u8::MAX as usize + 1 {
+        if self.current().locals.len() == u8::MAX as usize + 1 {
             self.error("Too many local variables in function.");
             return;
         }
 
-        self.locals.push(Local {
+        self.current().locals.push(Local {
             depth: None,
             name: name,
         });
@@ -308,11 +331,11 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn resolve_local(&mut self, name: &str) -> Option<u8> {
-        let i = self.locals
+        let i = self.current().locals
             .iter()
             .rposition(|x| x.name == name)?;
 
-        if self.locals[i].depth.is_none() {
+        if self.current().locals[i].depth.is_none() {
             self.error("Can't read local variable in its own initializer.");
         }
 
@@ -337,7 +360,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn make_constant(&mut self, v: &Value) -> u8 {
-        let x = self.chunk.add_constant(*v);
+        let x = self.current_chunk().add_constant(*v);
         if x > u8::MAX as usize {
             self.error("Too many constants in one chunk.");
             return 0;
@@ -423,15 +446,15 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn begin_scope(&mut self) {
-        self.scope_depth += 1;
+        self.current().scope_depth += 1;
     }
 
     fn end_scope(&mut self) {
-        self.scope_depth -= 1;
-        let sd = self.scope_depth;
+        self.current().scope_depth -= 1;
+        let sd = self.current().scope_depth;
 
-        while self.locals.last().is_some_and(|l| l.depth.is_some_and(|d| d > sd)) {
-            self.locals.pop();
+        while self.current().locals.last().is_some_and(|l| l.depth.is_some_and(|d| d > sd)) {
+            self.current().locals.pop();
             self.emit_byte(OPCODE::Pop);
         }
     }
@@ -468,7 +491,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.chunk.code.len();
+        let loop_start = self.current_chunk().code.len();
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after 'while'.");
@@ -494,7 +517,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             self.expression_statement();
         }
     
-        let mut loop_start = self.chunk.code.len();
+        let mut loop_start = self.current_chunk().code.len();
         let mut exit_jump: isize = -1; // TODO: could use Option but lazy translation
         if !self.match_token(TokenType::Semicolon) {
             self.expression();
@@ -506,7 +529,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
         if !self.match_token(TokenType::RightParen) {
             let body_jump = self.emit_jump(OPCODE::Jump as u8);
-            let increment_start = self.chunk.code.len();
+            let increment_start = self.current_chunk().code.len();
             self.expression();
             self.emit_byte(OPCODE::Pop);
             self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
@@ -551,7 +574,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
     fn emit_loop(&mut self, loop_start: usize) {
         self.emit_byte(OPCODE::Loop);
 
-        let offset = self.chunk.code.len() - loop_start + 2;
+        let offset = self.current_chunk().code.len() - loop_start + 2;
         if offset > u16::MAX as usize {
             self.error("Loop body too large.");
         }
@@ -565,18 +588,18 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.emit_byte(0xff);
         self.emit_byte(0xff);
 
-        self.chunk.code.len() - 2
+        self.current_chunk().code.len() - 2
     }
 
     fn patch_jump(&mut self, offset: usize) {
-        let jump = self.chunk.code.len() - offset - 2;
+        let jump = self.current_chunk().code.len() - offset - 2;
 
         if jump > u16::MAX as usize {
             self.error("Too much code to jump over.");
         }
 
-        self.chunk.code[offset] = ((jump >> 8) & 0xff) as u8;
-        self.chunk.code[offset + 1] = (jump & 0xff) as u8;
+        self.current_chunk().code[offset] = ((jump >> 8) & 0xff) as u8;
+        self.current_chunk().code[offset + 1] = (jump & 0xff) as u8;
     }
 
     fn print_statement(&mut self) {
@@ -614,8 +637,19 @@ impl<'src, 'c> Compiler<'src, 'c> {
         }
     }
 
-    pub fn compile(source: &str, heap: &mut Heap) -> Result<Chunk, IError> {
-        let mut chunk = Chunk::default();
+    fn init_compiler(&mut self, fn_type: FunctionType) {
+        self.states.push(FunctionState {
+            fn_type,
+            function: Function::default(),
+            locals: vec![Local {
+                name: "",
+                depth: Some(0),
+            }],
+            scope_depth: 0,
+        });
+    }
+
+    pub fn compile(source: &str, heap: &mut Heap) -> Result<ObjRef, IError> {
         let mut c = Compiler {
             scanner: Scanner::new(source),
             parser: Parser {
@@ -624,11 +658,11 @@ impl<'src, 'c> Compiler<'src, 'c> {
                 had_error: false,
                 panic_mode: false,
             },
-            chunk: &mut chunk,
             heap: heap,
-            locals: Vec::new(),
-            scope_depth: 0,
+            states: Vec::new(),
         };
+
+        c.init_compiler(FunctionType::Script);
 
         c.advance();
         
@@ -636,12 +670,12 @@ impl<'src, 'c> Compiler<'src, 'c> {
             c.declaration();
         }
 
-        c.end_compiler();
+        let r = c.end_compiler();
 
         if c.parser.had_error {
             return Err(IError::CompileError)
         }
 
-        Ok(chunk)
+        Ok(r)
     }
 }

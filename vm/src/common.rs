@@ -1,3 +1,8 @@
 // I don't want to have to mentally think about cargo feature flags.
-pub const DEBUG_TRACE_EXECUTION: bool = true;
-pub const DEBUG_PRINT_CODE: bool = true;
+
+// Debugging Stuff
+pub const DEBUG_TRACE_EXECUTION:    bool = cfg!(debug_assertions);
+pub const DEBUG_PRINT_CODE:         bool = cfg!(debug_assertions);
+
+// Core VM Constants
+pub const FRAMES_MAX: usize = 64;

@@ -42,6 +42,7 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
   acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
 - **No "Claude-isms"** (explicit, 2026-11-12): plain prose. Avoid stacked tables, bold
   everywhere, callout quotes, "the trick is…"-style framing, and tacked-on quiz questions.
+  Same for visuals I make him (2026-11-17): no taglines or written copy, just numbers and data labels.
 - Be proactive about recording his preferences here in CLAUDE.md as they come up, without
   waiting to be asked each time. When he states an *explicit* preference (not an inferred
   observation), record it the same turn — don't downgrade it to an "I'll note that" offer and
@@ -87,7 +88,7 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
   the "why," not just unblock.
 
 ## Temporary note — raise with him to clear
-PL-class final project, due 2026-12-04 (his own target: done by 2026-11-23): goal Ch. 23, stretch 24–25 (closures); prof (re-confirmed 2026-11-12) says
+PL-class final project, due 2026-12-04 (his own target: done by 2026-11-23): required goal now through Ch. 25 (advisor, 2026-11-18); prof says
 skip strings and/or GC, prioritize closures; he plans to back-fill skipped chapters afterward. **Bring this up as an item to clear** once he's past Ch. 25, or on any
 session after 2026-12-04.
 

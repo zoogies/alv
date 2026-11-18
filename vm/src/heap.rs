@@ -1,7 +1,21 @@
 use core::fmt;
 
+use crate::chunk::Chunk;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ObjRef(u32);
+
+pub enum FunctionType {
+    Function,
+    Script,
+}
+
+#[derive(Default)]
+pub struct Function {
+    pub arity: u8,
+    pub chunk: Chunk,
+    pub name: Option<Box<str>>,
+}
 
 impl std::fmt::Display for ObjRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -11,6 +25,7 @@ impl std::fmt::Display for ObjRef {
 
 pub enum Obj {
     String(Box<str>),
+    Function(Function),
 }
 
 #[derive(Default)]
@@ -41,7 +56,8 @@ impl Heap {
 
     pub fn get_str(&self, r: ObjRef) -> &str {
         match self.get(r) {
-            Obj::String(s) => s
+            Obj::String(s) => s,
+            _ => unreachable!(), // only reachable if the compiler emitted bad bytecode
         }
     }
 }

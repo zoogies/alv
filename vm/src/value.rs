@@ -28,7 +28,15 @@ impl fmt::Display for ValueDisplay<'_> {
             Value::Number(v) => write!(f, "{v}"),
             Value::Obj(o) => {
                 match self.heap.get(o) {
-                    Obj::String(s) => write!(f, "{s}")
+                    Obj::String(s) => write!(f, "{s}"),
+                    Obj::Function(func) => {
+                        if let Some(s) = &func.name {
+                            write!(f, "<fn {}>", s)
+                        }
+                        else {
+                            write!(f, "<script>")
+                        }
+                    },
                 }
             }
         }

@@ -50,9 +50,15 @@ impl Stack {
     }
 }
 
+struct CallFrame {
+    function:   ObjRef,
+    ip:         usize,
+    slots:      usize,
+}
+
 #[derive(Default)]
 pub struct VM {
-    ip:         usize,
+    frames:     Vec<CallFrame>,
     stack:      Stack,
     heap:       Heap,
     globals:    FxHashMap<Box<str>, Value>,
@@ -81,6 +87,7 @@ fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
         (Value::Obj(a), Value::Obj(b)) => {
             match (heap.get(a), heap.get(b)) {
                 (Obj::String(a), Obj::String(b)) => a == b,
+                _ => a == b,
             }
         }
         _ => false,
@@ -88,39 +95,64 @@ fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
 }
 
 impl VM {
+    fn frame(&mut self) -> &mut CallFrame {
+        self.frames.last_mut().expect("Zero frames in existence during call to frame()")
+    }
+
+    fn chunk(&self) -> &Chunk {
+        let f = self.frames.last().expect("Tried to get chunk while there are zero frames.").function;
+        match self.heap.get(f) {
+            Obj::Function(f) => {
+                &f.chunk
+            },
+            _ => unreachable!(),
+        }
+    }
+
     // format all messages at call sites
-    fn runtime_error(&mut self, msg: &str, chunk: &Chunk) {
+    fn runtime_error(&mut self, msg: &str) {
+        let ip = self.frame().ip;
+        let line = self.chunk().lines[ip - 1];
         eprintln!("{msg}");
-        eprintln!("[line {}] in script", chunk.lines[self.ip - 1]);
+        eprintln!("[line {}] in script", line);
+        self.stack.reset();
+        self.frames.clear();
         self.stack.reset();
     }
 
-    fn read_byte(&mut self, chunk: &Chunk) -> u8 {
-        self.ip += 1;
-        chunk.code[self.ip - 1]
+    fn read_byte(&mut self) -> u8 {
+        self.frame().ip += 1;
+        let ip = self.frame().ip;
+        self.chunk().code[ip - 1]
     }
 
-    fn read_constant(&mut self, chunk: &Chunk) -> Value {
-        chunk.constants[self.read_byte(chunk) as usize]
+    fn read_constant(&mut self) -> Value {
+        let b = self.read_byte();
+        self.chunk().constants[b as usize]
     }
 
-    fn read_short(&mut self, chunk: &Chunk) -> u16 {
-        u16::from_be_bytes([self.read_byte(chunk),self.read_byte(chunk)])
+    fn read_short(&mut self) -> u16 {
+        let b1 = self.read_byte();
+        let b2 = self.read_byte();
+        u16::from_be_bytes([b1, b2])
     }
 
-    fn read_string(&mut self, chunk: &Chunk) -> ObjRef {
-        match chunk.constants[self.read_byte(chunk) as usize] {
+    fn read_string(&mut self) -> ObjRef {
+        let b = self.read_byte();
+        match self.chunk().constants[b as usize] {
             Value::Obj(o) => o,
             _ => panic!("wtf")
         }
     }
 
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
-        let chunk = Compiler::compile(input, &mut self.heap)?;
-        self.run(&chunk)
+        let f = Compiler::compile(input, &mut self.heap)?;
+        self.stack.push(Value::Obj(f));
+        self.frames.push(CallFrame { function: f, ip: 0, slots: 0 });
+        self.run()
     }
 
-    fn run(&mut self, chunk: &Chunk) -> InterpretResult {
+    fn run(&mut self) -> InterpretResult {
         macro_rules! binary_op {
             ($ctor:path, $op:tt) => {{
                 match (self.stack.peek(1), self.stack.peek(0)) {
@@ -130,14 +162,12 @@ impl VM {
                         self.stack.push($ctor(a $op b));
                     }
                     _ => {
-                        self.runtime_error("Operands must be numbers.", chunk);
+                        self.runtime_error("Operands must be numbers.");
                         return Err(RuntimeError);
                     }
                 }
             }};
         }
-        
-        self.ip = 0;
         
         loop {
             if DEBUG_TRACE_EXECUTION {
@@ -148,55 +178,59 @@ impl VM {
                     print!(" ]");
                 }
                 println!();
-                dissassemble_instruction(chunk, self.ip, &self.heap);
+                let ip = self.frame().ip;
+                let c = self.chunk();
+                dissassemble_instruction(c, ip, &self.heap);
             }
 
-            let Some(op) = OPCODE::from_u8(self.read_byte(chunk)) else { panic!("Fuck you, Rust compiler!") };
+            let Some(op) = OPCODE::from_u8(self.read_byte()) else { panic!("Fuck you, Rust compiler!") };
             match op {
                 OPCODE::Loop => {
-                    let offset = self.read_short(chunk);
-                    self.ip -= offset as usize;
+                    let offset = self.read_short();
+                    self.frame().ip -= offset as usize;
                 },
                 OPCODE::Jump => {
-                    let offset = self.read_short(chunk) as usize;
-                    self.ip += offset;
+                    let offset = self.read_short() as usize;
+                    self.frame().ip += offset;
                 },
                 OPCODE::JumpIfFalse => {
-                    let offset = self.read_short(chunk) as usize;
+                    let offset = self.read_short() as usize;
                     if is_falsey(self.stack.peek(0)) {
-                        self.ip += offset;
+                        self.frame().ip += offset;
                     }
                 },
                 OPCODE::GetLocal => {
-                    let slot = self.read_byte(chunk);
+                    let slot = self.read_byte();
+                    let base = self.frame().slots;
                     self.stack.push(self.stack.get(slot as usize));
                 },
                 OPCODE::SetLocal => {
-                    let slot = self.read_byte(chunk);
-                    self.stack.set(slot as usize, self.stack.peek(0))
+                    let slot = self.read_byte();
+                    let base = self.frame().slots;
+                    self.stack.set(base + slot as usize, self.stack.peek(0))
                 },
                 OPCODE::SetGlobal => {
-                    let h = self.read_string(chunk);
+                    let h = self.read_string();
                     let r = self.heap.get_str(h);
 
                     let Some(g) = self.globals.get_mut(r) else {
-                        self.runtime_error(&format!("Undefined variable '{}'.", r), chunk);
+                        self.runtime_error(&format!("Undefined variable '{}'.", r));
                         return Err(RuntimeError);
                     };
 
                     *g = self.stack.peek(0);
                 },
                 OPCODE::DefineGlobal => {
-                    let h = self.read_string(chunk);
+                    let h = self.read_string();
                     let r = self.heap.get_str(h);
                     self.globals.insert(r.into(), self.stack.peek(0));
                     self.stack.pop();
                 },
                 OPCODE::GetGlobal => {
-                    let h = self.read_string(chunk);
+                    let h = self.read_string();
                     let r = self.heap.get_str(h);
                     let Some(g) = self.globals.get(r) else {
-                        self.runtime_error(&format!("Undefined variable '{}'.", r), chunk);
+                        self.runtime_error(&format!("Undefined variable '{}'.", r));
                         return Err(RuntimeError);
                     };
                     self.stack.push(*g);
@@ -212,7 +246,7 @@ impl VM {
                     return Ok(());
                 },
                 OPCODE::Constant => {
-                    let constant: Value = self.read_constant(chunk);
+                    let constant: Value = self.read_constant();
                     self.stack.push(constant);
                 },
                 OPCODE::Nil => self.stack.push(Value::Nil),
@@ -232,6 +266,10 @@ impl VM {
                                     self.stack.pop();
                                     self.stack.pop();
                                     self.stack.push(Value::Obj(r));
+                                },
+                                _ => {
+                                    self.runtime_error("Operands must be two numbers or two strings.");
+                                    return Err(RuntimeError);
                                 }
                             }
                         },
@@ -241,7 +279,7 @@ impl VM {
                             self.stack.push(Value::Number(a + b));
                         }
                         _ => {
-                            self.runtime_error("Operands must be two numbers or two strings.", chunk);
+                            self.runtime_error("Operands must be two numbers or two strings.");
                             return Err(RuntimeError);
                         }
                     }
@@ -257,7 +295,7 @@ impl VM {
                             self.stack.push(Value::Number(-n));
                         }
                         _ => {
-                            self.runtime_error("Operand must be a number.", chunk);
+                            self.runtime_error("Operand must be a number.");
                             return Err(RuntimeError);
                         }
                     }
