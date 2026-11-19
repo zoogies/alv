@@ -28,16 +28,10 @@ impl fmt::Display for ValueDisplay<'_> {
             Value::Number(v) => write!(f, "{v}"),
             Value::Obj(o) => {
                 match self.heap.get(o) {
-                    Obj::String(s) => write!(f, "{s}"),
-                    Obj::Function(func) => {
-                        if let Some(s) = &func.name {
-                            write!(f, "<fn {}>", s)
-                        }
-                        else {
-                            write!(f, "<script>")
-                        }
-                    },
-                    Obj::Native(_) => write!(f, "<native fn>")
+                    Obj::String(s)       => write!(f, "{s}"),
+                    Obj::Function(func)  => print_fn(f, func),
+                    Obj::Native(_)                  => write!(f, "<native fn>"),
+                    Obj::Closure(func)    => print_fn(f, self.heap.get_fn(func.function)),
                 }
             }
         }
@@ -46,4 +40,13 @@ impl fmt::Display for ValueDisplay<'_> {
 
 pub fn print_value(v: &Value, heap: &Heap) {
     print!("{}",v.display(heap))
+}
+
+fn print_fn(f: &mut fmt::Formatter<'_>, func: &Function) -> fmt::Result {
+    if let Some(s) = &func.name {
+        write!(f, "<fn {}>", s)
+    }
+    else {
+        write!(f, "<script>")
+    }
 }

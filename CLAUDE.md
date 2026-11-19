@@ -40,6 +40,9 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
   when it's genuinely warranted — especially while he's still in an exploratory/design phase on
   a question — but treat that as the exception, not the default. When he asks for "just a simple
   acknowledgement," give exactly that (a confirm or a crisp correction), not a mini-essay.
+- **Don't flag book scaffolding as redundant** (2026-11-19): if book code looks duplicative now
+  because a later section extends it, don't point that out — he knows the book's staging is deliberate.
+  Likewise don't suggest `todo!()` stubs or other "make it compile" scaffolding while he's mid-section.
 - **Verify, don't delegate checks** (2026-11-18): never say "double-check X"; read the code
   myself and only mention it if it's wrong. Every actionable item gets `file:line` plus the
   surrounding snippet so he can find it without hunting.

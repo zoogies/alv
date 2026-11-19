@@ -50,6 +50,15 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> us
         OPCODE::JumpIfFalse =>  jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset),
         OPCODE::Loop =>         jump_instruction("OP_LOOP", -1, chunk, offset),
         OPCODE::Call =>         byte_instruction("OP_CALL", chunk, offset),
+        OPCODE::Closure => {
+            let constant = chunk.code[offset + 1];
+            print!("{:<16} {:>4} ", "OP_CLOSURE", constant);
+            print_value(&chunk.constants[constant as usize], heap);
+            print!("\n");
+            offset + 2
+        },
+        OPCODE::GetUpvalue =>   byte_instruction("OP_GET_UPVALUE", chunk, offset),
+        OPCODE::SetUpvalue =>   byte_instruction("OP_SET_UPVALUE", chunk, offset),
     }
 }
 

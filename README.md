@@ -11,6 +11,8 @@ This repo is totally WIP and not a real thing you should even try to build or us
 example:
 
 ```bash
-cargo run -- tests/9.2.lox # vm (default)
-cargo run -p alv-treewalk -- tests/9.2.lox 
+cargo run -- tests/9.2.lox                      # vm (default)
+cargo run -p alv-treewalk -- tests/9.2.lox      # treewalk interpreter
+cargo run                                       # open repl
+cargo run --release                             # repl without debug output
 ```

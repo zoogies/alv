@@ -21,10 +21,16 @@ pub struct Local<'src> {
     depth: Option<u32>, // may or may not be initialized. u32 is arbitrary, needs to be large for edge case weird depths {{{{{...{x}...}}}}}
 }
 
+pub struct Upvalue {
+    index:      u8,
+    is_local:   bool,
+}
+
 pub struct FunctionState<'src> {
     function:       Function,
     fn_type:        FunctionType,
     locals:         Vec<Local<'src>>,
+    upvalues:       Vec<Upvalue>,
     scope_depth:    u32,
 }
 
@@ -332,22 +338,50 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.named_variable(self.parser.previous.slice, can_assign);
     }
 
-    fn resolve_local(&mut self, name: &str) -> Option<u8> {
-        let i = self.current().locals
+    fn resolve_local(&mut self, name: &str, depth: usize) -> Option<u8> {
+        let i = self.states[depth].locals
             .iter()
             .rposition(|x| x.name == name)?;
 
-        if self.current().locals[i].depth.is_none() {
+        if self.states[depth].locals[i].depth.is_none() {
             self.error("Can't read local variable in its own initializer.");
         }
 
         Some(i as u8)
     }
 
+    fn add_upvalue(&mut self, depth: usize, index: u8, is_local: bool) -> u8 {
+        for (i, uv) in self.states[depth].upvalues.iter().enumerate() {
+            if uv.index == index && uv.is_local == is_local {
+                return i as u8;
+            }
+        }
+
+        if self.states[depth].upvalues.len() == u8::MAX as usize + 1 {
+            self.error("Too many closure variables in function.");
+            return 0;
+        }
+
+        self.states[depth].upvalues.push(Upvalue {index, is_local });
+        (self.states[depth].upvalues.len() - 1) as u8
+    }
+
+    fn resolve_upvalue(&mut self, name: &str, depth: usize) -> Option<u8> {
+        if depth == 0 { return None }
+        if let Some(local) = self.resolve_local(name, depth - 1) {
+            return Some(self.add_upvalue(depth, local, true))
+        }
+
+        None
+    }
+
     fn named_variable(&mut self, name: &str, can_assign: bool) {
-        let (get_op, set_op, arg) = match self.resolve_local(name) {
-            Some(slot) => (OPCODE::GetLocal, OPCODE::SetLocal, slot),
-            None => (OPCODE::GetGlobal, OPCODE::SetGlobal, self.identifier_constant(name))
+        let (get_op, set_op, arg) = if let Some(slot) = self.resolve_local(name, self.states.len() - 1) {
+            (OPCODE::GetLocal, OPCODE::SetLocal, slot)
+        } else if let Some(i) = self.resolve_upvalue(name, self.states.len() - 1) {
+            (OPCODE::GetUpvalue, OPCODE::SetUpvalue, i)
+        } else {
+            (OPCODE::GetGlobal, OPCODE::SetGlobal, self.identifier_constant(name))
         };
 
         if can_assign && self.match_token(TokenType::Equal) {
@@ -533,7 +567,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
         let function = self.end_compiler();
         let c = self.make_constant(&Value::Obj(function));
-        self.emit_byte(OPCODE::Constant);
+        self.emit_byte(OPCODE::Closure);
         self.emit_byte(c);
     }
 
@@ -738,6 +772,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
                 name: "",
                 depth: Some(0),
             }],
+            upvalues: vec![],
             scope_depth: 0,
         });
     }

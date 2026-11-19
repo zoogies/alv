@@ -51,7 +51,7 @@ impl Stack {
 }
 
 struct CallFrame {
-    function:   ObjRef,
+    closure:    ObjRef,
     ip:         usize,
     slots:      usize,
 }
@@ -110,8 +110,9 @@ impl VM {
     }
 
     fn chunk(&self) -> &Chunk {
-        let f = self.frames.last().expect("Tried to get chunk while there are zero frames.").function;
-        &self.heap.get_fn(f).chunk
+        let f = &self.frames.last().expect("Tried to get chunk while there are zero frames.").closure;
+        let c = self.heap.get_closure(*f);
+        &self.heap.get_fn(c.function).chunk
     }
 
     // format all messages at call sites
@@ -119,7 +120,8 @@ impl VM {
         eprintln!("{msg}");
 
         for f in self.frames.iter().rev() {
-            let function = self.heap.get_fn(f.function);
+            let closure = self.heap.get_closure(f.closure);
+            let function = self.heap.get_fn(closure.function);
             let line = function.chunk.lines[f.ip - 1];
             let place = match function.name.as_deref() {
                 Some(n) => format!("{n}()"),
@@ -158,9 +160,10 @@ impl VM {
         }
     }
 
-    fn call(&mut self, r: ObjRef, arg_count: u8) -> bool {
-        match self.heap.get(r) {
-            Obj::Function(f) => {
+    fn call(&mut self, closure: ObjRef, arg_count: u8) -> bool {
+        match self.heap.get(closure) {
+            Obj::Closure(c) => {
+                let f = self.heap.get_fn(c.function);
                 if arg_count != f.arity {
                     self.runtime_error(&format!("Expected {} arguments but got {}.", f.arity, arg_count));
                     return false
@@ -175,7 +178,7 @@ impl VM {
         }
 
         self.frames.push(CallFrame {
-            function: r,
+            closure,
             ip: 0,
             slots: self.stack.top() - arg_count as usize - 1,
         });
@@ -185,7 +188,7 @@ impl VM {
     fn call_value(&mut self, callee: &Value, arg_count: u8) -> bool {
         if let Value::Obj(r) = callee {
             match self.heap.get(*r) {
-                Obj::Function(_) => return self.call(*r, arg_count),
+                Obj::Closure(_) => return self.call(*r, arg_count),
                 Obj::Native(nf) => {
                     let values = &self.stack.stack.split_off(self.stack.stack.len() - arg_count as usize);
                     let rv = nf(values);
@@ -202,8 +205,12 @@ impl VM {
 
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
         let f = Compiler::compile(input, &mut self.heap)?;
-        self.stack.push(Value::Obj(f));
-        self.call(f, 0);
+        let c = self.heap.alloc(Obj::Closure(Closure {
+            function: f,
+            upvalues: vec![],
+        }));
+        self.stack.push(Value::Obj(c));
+        self.call(c, 0);
         
         self.run()
     }
@@ -241,6 +248,17 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte()) else { panic!("Fuck you, Rust compiler!") };
             match op {
+                OPCODE::Closure => {
+                    let c = match self.read_constant() {
+                        Value::Obj(r) => r,
+                        _ => unreachable!()
+                    };
+                    let v = self.heap.alloc(Obj::Closure(Closure {
+                        function: c,
+                        upvalues: vec![],
+                    }));
+                    self.stack.push(Value::Obj(v));
+                },
                 OPCODE::Call => {
                     let arg_count = self.read_byte();
                     let p = self.stack.peek(arg_count as usize);

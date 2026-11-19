@@ -30,6 +30,9 @@ pub enum OPCODE {
     Jump,
     Loop,
     Call,
+    Closure,
+    GetUpvalue,
+    SetUpvalue,
 }
 
 impl From<OPCODE> for u8 {

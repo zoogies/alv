@@ -13,9 +13,10 @@ pub enum FunctionType {
 
 #[derive(Default)]
 pub struct Function {
-    pub arity: u8,
-    pub chunk: Chunk,
-    pub name: Option<Box<str>>,
+    pub arity:          u8,
+    pub upvalue_count:  usize,  
+    pub chunk:          Chunk,
+    pub name:           Option<Box<str>>,
 }
 
 impl std::fmt::Display for ObjRef {
@@ -26,10 +27,16 @@ impl std::fmt::Display for ObjRef {
 
 pub type NativeFn = fn(&[Value]) -> Value;
 
+pub struct Closure {
+    pub function:   ObjRef,
+    pub upvalues:   Vec<ObjRef>,
+}
+
 pub enum Obj {
     String(Box<str>),
     Function(Function),
     Native(NativeFn),
+    Closure(Closure),
 }
 
 #[derive(Default)]
@@ -68,6 +75,13 @@ impl Heap {
     pub fn get_fn(&self, r: ObjRef) -> &Function {
         match self.get(r) {
             Obj::Function(f) => f,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_closure(&self, r: ObjRef) -> &Closure {
+        match self.get(r) {
+            Obj::Closure(c) => c,
             _ => unreachable!(),
         }
     }
