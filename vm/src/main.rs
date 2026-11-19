@@ -29,7 +29,7 @@ fn run_file(path: &str) {
             exit(-1); // TODO: something better
         }
     };
-    let mut vm = VM::default();
+    let mut vm = VM::new();
     let res = vm.interpret(&program);
 
     match res {
@@ -41,7 +41,7 @@ fn run_file(path: &str) {
 
 fn repl() {
     let mut input = String::new();
-    let mut vm = VM::default();
+    let mut vm = VM::new();
 
     loop {
         print!("> ");

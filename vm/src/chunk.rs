@@ -29,6 +29,7 @@ pub enum OPCODE {
     JumpIfFalse,
     Jump,
     Loop,
+    Call,
 }
 
 impl From<OPCODE> for u8 {

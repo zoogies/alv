@@ -13,3 +13,7 @@ tracking easy optimization targets rn:
 personal ideas:
 - loop unrolling?
 - can always go look at llvm for ideas for passes
+
+```
+Most of the remaining overhead is in fetching each instruction. Every read_byte calls self.frame() twice, and each call does a last_mut().expect(..). Then chunk() does another frames.last(), a heap index, a get_fn match, and a bounds-checked index into code. That's several lookups per bytecode byte. The book avoids this by caching the current frame in a local inside run(): CallFrame* frame = &vm.frames[vm.frameCount - 1];. A Rust version of that caching is a nice speedup to come back to after the deadline. It's not worth doing now.
+```

@@ -49,6 +49,7 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> us
         OPCODE::Jump =>         jump_instruction("OP_JUMP", 1, chunk, offset),
         OPCODE::JumpIfFalse =>  jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset),
         OPCODE::Loop =>         jump_instruction("OP_LOOP", -1, chunk, offset),
+        OPCODE::Call =>         byte_instruction("OP_CALL", chunk, offset),
     }
 }
 

@@ -37,6 +37,7 @@ impl fmt::Display for ValueDisplay<'_> {
                             write!(f, "<script>")
                         }
                     },
+                    Obj::Native(_) => write!(f, "<native fn>")
                 }
             }
         }

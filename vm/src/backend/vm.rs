@@ -5,11 +5,12 @@ use crate::backend::vm::IError::RuntimeError;
 use crate::common::*;
 use crate::chunk::*;
 use crate::debug::dissassemble_instruction;
+use crate::natives::clock;
 use crate::value::*;
 use crate::frontend::compiler::*;
 use crate::heap::*;
 
-const STACK_MAX: usize = 256;
+const STACK_MAX: usize = FRAMES_MAX * (u8::MAX as usize + 1);
 
 #[derive(Default)]
 struct Stack {
@@ -17,10 +18,9 @@ struct Stack {
 }
 
 impl Stack {
-    // TODO: removeme? maybe there are places we should use this? i have written this expr a lot
-    // pub fn top(&self) -> usize {
-    //     self.stack.len()
-    // }
+    pub fn top(&self) -> usize {
+        self.stack.len()
+    }
 
     pub fn push(&mut self, v: Value) {
         if self.stack.len() == STACK_MAX {
@@ -95,26 +95,39 @@ fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
 }
 
 impl VM {
+
+    pub fn define_native(&mut self, name: &str, f : NativeFn) {
+        let r = self.heap.alloc(Obj::Native(f));
+        self.globals.insert(name.into(), Value::Obj(r));
+    }
+
+    fn register_stdlib(&mut self) {
+        self.define_native("clock", clock);
+    }
+
     fn frame(&mut self) -> &mut CallFrame {
         self.frames.last_mut().expect("Zero frames in existence during call to frame()")
     }
 
     fn chunk(&self) -> &Chunk {
         let f = self.frames.last().expect("Tried to get chunk while there are zero frames.").function;
-        match self.heap.get(f) {
-            Obj::Function(f) => {
-                &f.chunk
-            },
-            _ => unreachable!(),
-        }
+        &self.heap.get_fn(f).chunk
     }
 
     // format all messages at call sites
     fn runtime_error(&mut self, msg: &str) {
-        let ip = self.frame().ip;
-        let line = self.chunk().lines[ip - 1];
         eprintln!("{msg}");
-        eprintln!("[line {}] in script", line);
+
+        for f in self.frames.iter().rev() {
+            let function = self.heap.get_fn(f.function);
+            let line = function.chunk.lines[f.ip - 1];
+            let place = match function.name.as_deref() {
+                Some(n) => format!("{n}()"),
+                None => "script".to_string(),
+            };
+            eprintln!("[line {}] in {}", line, place);
+        }
+
         self.stack.reset();
         self.frames.clear();
         self.stack.reset();
@@ -145,10 +158,53 @@ impl VM {
         }
     }
 
+    fn call(&mut self, r: ObjRef, arg_count: u8) -> bool {
+        match self.heap.get(r) {
+            Obj::Function(f) => {
+                if arg_count != f.arity {
+                    self.runtime_error(&format!("Expected {} arguments but got {}.", f.arity, arg_count));
+                    return false
+                }
+            },
+            _ => unreachable!()
+        }
+
+        if self.frames.len() == FRAMES_MAX {
+            self.runtime_error("Stack overflow.");
+            return false
+        }
+
+        self.frames.push(CallFrame {
+            function: r,
+            ip: 0,
+            slots: self.stack.top() - arg_count as usize - 1,
+        });
+        true
+    }
+
+    fn call_value(&mut self, callee: &Value, arg_count: u8) -> bool {
+        if let Value::Obj(r) = callee {
+            match self.heap.get(*r) {
+                Obj::Function(_) => return self.call(*r, arg_count),
+                Obj::Native(nf) => {
+                    let values = &self.stack.stack.split_off(self.stack.stack.len() - arg_count as usize);
+                    let rv = nf(values);
+                    self.stack.pop();
+                    self.stack.push(rv);
+                    return true;
+                }
+                _ => ()
+            }
+        }
+        self.runtime_error("Can only call functions and classes.");
+        false
+    }
+
     pub fn interpret(&mut self, input: &str) -> InterpretResult {
         let f = Compiler::compile(input, &mut self.heap)?;
         self.stack.push(Value::Obj(f));
-        self.frames.push(CallFrame { function: f, ip: 0, slots: 0 });
+        self.call(f, 0);
+        
         self.run()
     }
 
@@ -185,6 +241,13 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte()) else { panic!("Fuck you, Rust compiler!") };
             match op {
+                OPCODE::Call => {
+                    let arg_count = self.read_byte();
+                    let p = self.stack.peek(arg_count as usize);
+                    if !self.call_value(&p, arg_count) {
+                        return Err(RuntimeError)
+                    }
+                },
                 OPCODE::Loop => {
                     let offset = self.read_short();
                     self.frame().ip -= offset as usize;
@@ -243,7 +306,15 @@ impl VM {
                     println!();
                 },
                 OPCODE::Return => {
-                    return Ok(());
+                    let v = self.stack.pop();
+                    let returning = self.frames.pop().expect("Somehow tried to frame pop with zero frames.");
+                    if self.frames.is_empty() {
+                        self.stack.pop();
+                        return Ok(())
+                    }
+
+                    self.stack.stack.truncate(returning.slots);
+                    self.stack.push(v);
                 },
                 OPCODE::Constant => {
                     let constant: Value = self.read_constant();
@@ -310,4 +381,15 @@ impl VM {
             }
         }
     }
-} 
+
+    pub fn new() -> Self {
+        let mut vm = VM::default();
+
+        if !ALV_NOSTD {
+            vm.register_stdlib();
+        }
+
+        vm
+    }
+
+}

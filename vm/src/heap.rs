@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::chunk::Chunk;
+use crate::{chunk::Chunk, value::Value};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ObjRef(u32);
@@ -24,9 +24,12 @@ impl std::fmt::Display for ObjRef {
     }
 }
 
+pub type NativeFn = fn(&[Value]) -> Value;
+
 pub enum Obj {
     String(Box<str>),
     Function(Function),
+    Native(NativeFn),
 }
 
 #[derive(Default)]
@@ -59,6 +62,13 @@ impl Heap {
         match self.get(r) {
             Obj::String(s) => s,
             _ => unreachable!(), // only reachable if the compiler emitted bad bytecode
+        }
+    }
+
+    pub fn get_fn(&self, r: ObjRef) -> &Function {
+        match self.get(r) {
+            Obj::Function(f) => f,
+            _ => unreachable!(),
         }
     }
 }

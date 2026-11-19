@@ -141,6 +141,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
     }
 
     fn emit_return(&mut self) {
+        self.emit_byte(OPCODE::Nil);
         self.emit_byte(OPCODE::Return);
     }
 
@@ -164,7 +165,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
     fn get_rule(&self, ty: TokenType) -> ParseRule<'src, 'c> {
         match ty {
-            TokenType::LeftParen => ParseRule { prefix: Some(Compiler::grouping), infix: None, precedence: Precedence::None },
+            TokenType::LeftParen => ParseRule { prefix: Some(Compiler::grouping), infix: Some(Compiler::call), precedence: Precedence::Call },
             TokenType::RightParen => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::LeftBrace => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
             TokenType::RightBrace => ParseRule { prefix: None, infix: None, precedence: Precedence::None },
@@ -404,6 +405,32 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
     }
 
+    fn argument_list(&mut self) -> u8 {
+        let mut arg_count = 0;
+        
+        if !self.check(TokenType::RightParen) {
+            loop {
+                self.expression();
+                if arg_count == u8::MAX {
+                    self.error("Can't have more than 255 arguments.");
+                }
+                else {
+                    arg_count += 1;
+                }
+
+                if !self.match_token(TokenType::Comma) { break }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+        arg_count
+    }
+
+    fn call(&mut self, _can_assign: bool) {
+        let arg_count = self.argument_list();
+        self.emit_byte(OPCODE::Call);
+        self.emit_byte(arg_count);
+    }
+
     fn unary(&mut self, _can_assign: bool) {
         let operator_ty = self.parser.previous.ty;
 
@@ -513,6 +540,9 @@ impl<'src, 'c> Compiler<'src, 'c> {
     fn statement(&mut self) {
         if self.match_token(TokenType::Print) {
             self.print_statement();
+        }
+        else if self.match_token(TokenType::Return) {
+            self.return_statement();
         }
         else if self.match_token(TokenType::For) {
             self.for_statement();
@@ -649,6 +679,21 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
         self.emit_byte(OPCODE::Print);
+    }
+
+    fn return_statement(&mut self) {
+        if self.current().fn_type == FunctionType::Script {
+            self.error("Can't return from top-level code.");
+        }
+
+        if self.match_token(TokenType::Semicolon) {
+            self.emit_return();
+        }
+        else {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+            self.emit_byte(OPCODE::Return);
+        }
     }
 
     fn expression_statement(&mut self) {
