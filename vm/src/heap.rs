@@ -1,8 +1,10 @@
 use core::fmt;
 
+use rustc_hash::FxHashMap;
+
 use crate::{chunk::Chunk, value::Value};
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct ObjRef(u32);
 
 #[derive(PartialEq)]
@@ -48,14 +50,8 @@ pub enum Obj {
 #[derive(Default)]
 pub struct Heap {
     objects: Vec<Obj>,
+    strings: FxHashMap<Box<str>, ObjRef>,
 }
-
-//
-// IMPORTANT NOTE:
-// we don't free anything (Sergey wants to skip gc)
-// so for now we have a really shaky handle assignment.
-// should be fine because eventually we will replace.
-//
 
 impl Heap {
     pub fn alloc(&mut self, obj: Obj) -> ObjRef {
@@ -63,8 +59,13 @@ impl Heap {
         ObjRef(self.objects.len() as u32 - 1) // TODO: REALLY BAD NO WORKIE WHEN REMOVE STRINGS
     }
 
-    pub fn alloc_string(&mut self, s: impl Into<Box<str>>) -> ObjRef {
-        self.alloc(Obj::String(s.into()))
+    pub fn alloc_string(&mut self, s: &str) -> ObjRef {
+        if let Some(&r) = self.strings.get(s) {
+            return r;
+        }
+        let r = self.alloc(Obj::String(s.into()));
+        self.strings.insert(s.into(), r);
+        r
     }
 
     pub fn get(&self, r: ObjRef) -> &Obj {

@@ -61,7 +61,7 @@ pub struct VM {
     frames:         Vec<CallFrame>,
     stack:          Stack,
     heap:           Heap,
-    globals:        FxHashMap<Box<str>, Value>,
+    globals:        FxHashMap<ObjRef, Value>,
     open_upvalues:  Vec<ObjRef>,
 }
 
@@ -80,17 +80,12 @@ fn is_falsey(v: Value) -> bool {
     }
 }
 
-fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
+fn values_equal(a: Value, b: Value) -> bool {
     match (a, b) {
         (Value::Bool(a), Value::Bool(b)) => a == b,
         (Value::Number(a), Value::Number(b)) => a == b,
         (Value::Nil, Value::Nil) => true,
-        (Value::Obj(a), Value::Obj(b)) => {
-            match (heap.get(a), heap.get(b)) {
-                (Obj::String(a), Obj::String(b)) => a == b,
-                _ => a == b,
-            }
-        }
+        (Value::Obj(a), Value::Obj(b)) => a == b,
         _ => false,
     }
 }
@@ -105,8 +100,9 @@ impl VM {
     }
 
     pub fn define_native(&mut self, name: &str, f : NativeFn) {
+        let key = self.heap.alloc_string(name);
         let r = self.heap.alloc(Obj::Native(f));
-        self.globals.insert(name.into(), Value::Obj(r));
+        self.globals.insert(key, Value::Obj(r));
     }
 
     fn register_stdlib(&mut self) {
@@ -364,10 +360,9 @@ impl VM {
                 },
                 OPCODE::SetGlobal => {
                     let h = self.read_string();
-                    let r = self.heap.get_str(h);
-
-                    let Some(g) = self.globals.get_mut(r) else {
-                        self.runtime_error(&format!("Undefined variable '{}'.", r));
+                    let Some(g) = self.globals.get_mut(&h) else {
+                        let name = self.heap.get_str(h);
+                        self.runtime_error(&format!("Undefined variable '{}'.", name));
                         return Err(RuntimeError);
                     };
 
@@ -375,15 +370,14 @@ impl VM {
                 },
                 OPCODE::DefineGlobal => {
                     let h = self.read_string();
-                    let r = self.heap.get_str(h);
-                    self.globals.insert(r.into(), self.stack.peek(0));
+                    self.globals.insert(h, self.stack.peek(0));
                     self.stack.pop();
                 },
                 OPCODE::GetGlobal => {
                     let h = self.read_string();
-                    let r = self.heap.get_str(h);
-                    let Some(g) = self.globals.get(r) else {
-                        self.runtime_error(&format!("Undefined variable '{}'.", r));
+                    let Some(g) = self.globals.get(&h) else {
+                        let name = self.heap.get_str(h);
+                        self.runtime_error(&format!("Undefined variable '{}'.", name));
                         return Err(RuntimeError);
                     };
                     self.stack.push(*g);
@@ -423,7 +417,7 @@ impl VM {
                         (Value::Obj(a), Value::Obj(b)) => {
                             match (self.heap.get(a), self.heap.get(b)) {
                                 (Obj::String(a), Obj::String(b)) => {
-                                    let r = self.heap.alloc_string(format!("{b}{a}"));
+                                    let r = self.heap.alloc_string(&format!("{b}{a}"));
                                     
                                     self.stack.pop();
                                     self.stack.pop();
@@ -465,7 +459,7 @@ impl VM {
                 OPCODE::Equal => {
                     let a = self.stack.pop();
                     let b = self.stack.pop();
-                    self.stack.push(Value::Bool(values_equal(a, b, &self.heap)))
+                    self.stack.push(Value::Bool(values_equal(a, b)))
                 },
                 OPCODE::Greater => binary_op!(Value::Bool, >),
                 OPCODE::Less => binary_op!(Value::Bool, <),
