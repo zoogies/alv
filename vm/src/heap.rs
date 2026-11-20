@@ -32,11 +32,17 @@ pub struct Closure {
     pub upvalues:   Vec<ObjRef>,
 }
 
+pub enum Upvalue {
+    Open(usize),    // on the stack
+    Closed(Value),  // in the heap
+}
+
 pub enum Obj {
     String(Box<str>),
     Function(Function),
     Native(NativeFn),
     Closure(Closure),
+    Upvalue(Upvalue),
 }
 
 #[derive(Default)]
@@ -63,6 +69,24 @@ impl Heap {
 
     pub fn get(&self, r: ObjRef) -> &Obj {
         &self.objects[r.0 as usize]
+    }
+
+    pub fn get_mut(&mut self, r: ObjRef) -> &mut Obj {
+        &mut self.objects[r.0 as usize]
+    }
+
+    pub fn get_upvalue(&self, r: ObjRef) -> &Upvalue {
+        match self.get(r) {
+            Obj::Upvalue(u) => u,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_upvalue_mut(&mut self, r: ObjRef) -> &mut Upvalue {
+        match self.get_mut(r) {
+            Obj::Upvalue(u) => u,
+            _ => unreachable!(),
+        }
     }
 
     pub fn get_str(&self, r: ObjRef) -> &str {

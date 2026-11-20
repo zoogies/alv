@@ -32,6 +32,7 @@ impl fmt::Display for ValueDisplay<'_> {
                     Obj::Function(func)  => print_fn(f, func),
                     Obj::Native(_)                  => write!(f, "<native fn>"),
                     Obj::Closure(func)    => print_fn(f, self.heap.get_fn(func.function)),
+                    Obj::Upvalue(_)                 => write!(f, "upvalue"),
                 }
             }
         }

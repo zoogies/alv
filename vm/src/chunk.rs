@@ -33,6 +33,7 @@ pub enum OPCODE {
     Closure,
     GetUpvalue,
     SetUpvalue,
+    CloseUpvalue,
 }
 
 impl From<OPCODE> for u8 {

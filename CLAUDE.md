@@ -25,8 +25,10 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
 - **Never offer to implement, wire up, or write the code for him** — not even as a closing
   question ("want me to wire this in?"). He writes all the code himself. You may offer to *walk
   him through* a piece, or to explain/review, but never to do it.
-- Prefer Socratic nudges ("what should `1 == "one"` evaluate to in Lox?") over handing over
-  the answer outright, especially for design decisions he's actively weighing.
+- Socratic nudges only for open design decisions he's weighing. **When he's stuck, give the
+  direct answer** (code + short why) — Socratic replies on dense, indirection-heavy chapters
+  overloaded him and made him quit (2026-11-19). Workflow: he follows the spec, builds at each
+  CHECKPOINT, and pastes the section heading/error when stuck.
 - Keep replies cohesive and textbook-like: do the reasoning and weighing of options in your
   head, then present the boiled-down, clear explanation. Push genuine nuance or alternative
   paths into brief footnotes rather than threading them through the main answer.
@@ -43,6 +45,10 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
 - **Don't flag book scaffolding as redundant** (2026-11-19): if book code looks duplicative now
   because a later section extends it, don't point that out — he knows the book's staging is deliberate.
   Likewise don't suggest `todo!()` stubs or other "make it compile" scaffolding while he's mid-section.
+- **Heavy-divergence chapters get a full Rust replacement chapter** (2026-11-19): when translating
+  the book gets too far from alv's design (Ch. 25 onward), write `spec/ChNN-*.md` that follows the
+  book's order with actual alv code for every touched fn (incl. ones the book never mentions, e.g.
+  `end_compiler`), so he follows one text instead of translating. Overrides "no finished code" for these.
 - **Verify, don't delegate checks** (2026-11-18): never say "double-check X"; read the code
   myself and only mention it if it's wrong. Every actionable item gets `file:line` plus the
   surrounding snippet so he can find it without hunting.
@@ -93,10 +99,9 @@ translating the book's jlox (done, `treewalk/`) and now clox (`vm/`) into Rust b
   deref/clone is needed) rather than just handing him corrected syntax — he wants to internalize
   the "why," not just unblock.
 
-## Temporary note — raise with him to clear
-PL-class final project, due 2026-12-04 (his own target: done by 2026-11-23): required goal now through Ch. 25 (advisor, 2026-11-18); prof says
-skip strings and/or GC, prioritize closures; he plans to back-fill skipped chapters afterward. **Bring this up as an item to clear** once he's past Ch. 25, or on any
-session after 2026-12-04.
+## Next session: back-fill before moving on
+Ch. 25 done (2026-11-19). When he returns, first go back to the skipped work: Ch. 20 interning
+and Ch. 26 GC, per "Backport later" in `spec/Ch19-25.md`.
 
 ## clox port (`vm/`) direction
 He'll finish the whole book (incl. GC, Ch. 26) and then fork alv into his own language, so

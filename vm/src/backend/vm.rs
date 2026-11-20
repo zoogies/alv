@@ -58,10 +58,11 @@ struct CallFrame {
 
 #[derive(Default)]
 pub struct VM {
-    frames:     Vec<CallFrame>,
-    stack:      Stack,
-    heap:       Heap,
-    globals:    FxHashMap<Box<str>, Value>,
+    frames:         Vec<CallFrame>,
+    stack:          Stack,
+    heap:           Heap,
+    globals:        FxHashMap<Box<str>, Value>,
+    open_upvalues:  Vec<ObjRef>,
 }
 
 pub enum IError {
@@ -95,6 +96,13 @@ fn values_equal(a: Value, b: Value, heap: &Heap) -> bool {
 }
 
 impl VM {
+
+    pub fn open_slot(&self, r: ObjRef) -> usize {
+        match self.heap.get_upvalue(r) {
+            Upvalue::Open(slot) => *slot,
+            Upvalue::Closed(_) => unreachable!(),
+        }
+    }
 
     pub fn define_native(&mut self, name: &str, f : NativeFn) {
         let r = self.heap.alloc(Obj::Native(f));
@@ -132,6 +140,7 @@ impl VM {
 
         self.stack.reset();
         self.frames.clear();
+        self.open_upvalues.clear();
         self.stack.reset();
     }
 
@@ -215,6 +224,31 @@ impl VM {
         self.run()
     }
 
+    fn capture_upvalue(&mut self, slot: usize) -> ObjRef {
+        let pos = self.open_upvalues.partition_point(|&r| self.open_slot(r) < slot);
+
+        if let Some(&r) = self.open_upvalues.get(pos) {
+            if self.open_slot(r) == slot {
+                return r;
+            }
+        }
+
+        let r = self.heap.alloc(Obj::Upvalue(Upvalue::Open(slot)));
+        self.open_upvalues.insert(pos, r);
+        r
+    }
+
+    fn close_upvalues(&mut self, last: usize) {
+        while let Some(&r) = self.open_upvalues.last() {
+            let slot = self.open_slot(r);
+            if slot < last { break }
+
+            let value = self.stack.get(slot);
+            *self.heap.get_upvalue_mut(r) = Upvalue::Closed(value);
+            self.open_upvalues.pop();
+        }
+    }
+
     fn run(&mut self) -> InterpretResult {
         macro_rules! binary_op {
             ($ctor:path, $op:tt) => {{
@@ -248,14 +282,52 @@ impl VM {
 
             let Some(op) = OPCODE::from_u8(self.read_byte()) else { panic!("Fuck you, Rust compiler!") };
             match op {
-                OPCODE::Closure => {
-                    let c = match self.read_constant() {
-                        Value::Obj(r) => r,
-                        _ => unreachable!()
+                OPCODE::CloseUpvalue => {
+                    let top = self.stack.top() - 1;
+                    self.close_upvalues(top);
+                    self.stack.pop();
+                },
+                OPCODE::GetUpvalue => {
+                    let slot = self.read_byte() as usize;
+                    let closure = self.frame().closure;
+                    let uv = self.heap.get_closure(closure).upvalues[slot];
+                    let value = match self.heap.get_upvalue(uv) {
+                        Upvalue::Open(i) => self.stack.get(*i),
+                        Upvalue::Closed(v) => *v,
                     };
+                    self.stack.push(value);
+                },
+                OPCODE::SetUpvalue => {
+                    let slot = self.read_byte() as usize;
+                    let closure = self.frame().closure;
+                    let uv = self.heap.get_closure(closure).upvalues[slot];
+                    let value = self.stack.peek(0);
+                    match self.heap.get_upvalue_mut(uv) {
+                        Upvalue::Open(i) => self.stack.set(*i, value),
+                        Upvalue::Closed(v) => *v = value,
+                    };
+                },
+                OPCODE::Closure => {
+                    let Value::Obj(function) = self.read_constant() else { unreachable!() };
+                    let count = self.heap.get_fn(function).upvalue_count;
+
+                    let mut upvalues = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        let is_local = self.read_byte();
+                        let index = self.read_byte() as usize;
+                        if is_local == 1 {
+                            let slots = self.frame().slots;
+                            upvalues.push(self.capture_upvalue(slots + index));
+                        }
+                        else {
+                            let enclosing = self.frame().closure;
+                            upvalues.push(self.heap.get_closure(enclosing).upvalues[index]);
+                        }
+                    }
+
                     let v = self.heap.alloc(Obj::Closure(Closure {
-                        function: c,
-                        upvalues: vec![],
+                        function: function,
+                        upvalues: upvalues,
                     }));
                     self.stack.push(Value::Obj(v));
                 },
@@ -326,6 +398,7 @@ impl VM {
                 OPCODE::Return => {
                     let v = self.stack.pop();
                     let returning = self.frames.pop().expect("Somehow tried to frame pop with zero frames.");
+                    self.close_upvalues(returning.slots);
                     if self.frames.is_empty() {
                         self.stack.pop();
                         return Ok(())

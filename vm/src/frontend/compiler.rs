@@ -17,11 +17,12 @@ struct Parser<'src> {
 }
 
 pub struct Local<'src> {
-    name: &'src str,    // no need for token because we report errors using parser lineno
-    depth: Option<u32>, // may or may not be initialized. u32 is arbitrary, needs to be large for edge case weird depths {{{{{...{x}...}}}}}
+    name:           &'src str,
+    depth:          Option<u32>, // may or may not be initialized. u32 is arbitrary, needs to be large for edge case weird depths {{{{{...{x}...}}}}}
+    is_captured:    bool,
 }
 
-pub struct Upvalue {
+struct Upvalue {
     index:      u8,
     is_local:   bool,
 }
@@ -151,10 +152,11 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.emit_byte(OPCODE::Return);
     }
 
-    fn end_compiler(&mut self) -> ObjRef {
+    fn end_compiler(&mut self) -> (ObjRef, Vec<Upvalue>) {
         self.emit_return();
 
-        let state = self.states.pop().expect("Ended compilation without a single state.");
+        let mut state = self.states.pop().expect("Ended compilation without a single state.");
+        state.function.upvalue_count = state.upvalues.len();
 
         if DEBUG_PRINT_CODE {
             if !self.parser.had_error {
@@ -166,7 +168,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             }
         }
 
-        self.heap.alloc(Obj::Function(state.function))
+        (self.heap.alloc(Obj::Function(state.function)), state.upvalues)
     }
 
     fn get_rule(&self, ty: TokenType) -> ParseRule<'src, 'c> {
@@ -289,6 +291,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.current().locals.push(Local {
             depth: None,
             name: name,
+            is_captured: false,
         });
     }
 
@@ -368,8 +371,14 @@ impl<'src, 'c> Compiler<'src, 'c> {
 
     fn resolve_upvalue(&mut self, name: &str, depth: usize) -> Option<u8> {
         if depth == 0 { return None }
+       
         if let Some(local) = self.resolve_local(name, depth - 1) {
+            self.states[depth - 1].locals[local as usize].is_captured = true;
             return Some(self.add_upvalue(depth, local, true))
+        }
+
+        if let Some(upvalue) = self.resolve_upvalue(name, depth - 1) {
+            return Some(self.add_upvalue(depth, upvalue, false))
         }
 
         None
@@ -526,8 +535,13 @@ impl<'src, 'c> Compiler<'src, 'c> {
         let sd = self.current().scope_depth;
 
         while self.current().locals.last().is_some_and(|l| l.depth.is_some_and(|d| d > sd)) {
-            self.current().locals.pop();
-            self.emit_byte(OPCODE::Pop);
+            let local = self.current().locals.pop().unwrap();
+            if local.is_captured {
+                self.emit_byte(OPCODE::CloseUpvalue);
+            }
+            else {
+                self.emit_byte(OPCODE::Pop);
+            }
         }
     }
 
@@ -565,10 +579,15 @@ impl<'src, 'c> Compiler<'src, 'c> {
         self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
         self.block();
 
-        let function = self.end_compiler();
+        let (function, upvalues) = self.end_compiler();
         let c = self.make_constant(&Value::Obj(function));
         self.emit_byte(OPCODE::Closure);
         self.emit_byte(c);
+
+        for uv in &upvalues {
+            self.emit_byte(uv.is_local);
+            self.emit_byte(uv.index);
+        }
     }
 
     fn statement(&mut self) {
@@ -771,6 +790,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             locals: vec![Local {
                 name: "",
                 depth: Some(0),
+                is_captured: false,
             }],
             upvalues: vec![],
             scope_depth: 0,
@@ -798,7 +818,7 @@ impl<'src, 'c> Compiler<'src, 'c> {
             c.declaration();
         }
 
-        let r = c.end_compiler();
+        let (r, _) = c.end_compiler();
 
         if c.parser.had_error {
             return Err(IError::CompileError)

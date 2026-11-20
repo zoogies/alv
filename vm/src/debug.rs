@@ -55,10 +55,23 @@ pub fn dissassemble_instruction(chunk: &Chunk, offset: usize, heap: &Heap) -> us
             print!("{:<16} {:>4} ", "OP_CLOSURE", constant);
             print_value(&chunk.constants[constant as usize], heap);
             print!("\n");
-            offset + 2
+
+            let Value::Obj(r) = chunk.constants[constant as usize] else { unreachable!() };
+            let function = heap.get_fn(r);
+
+            let mut offset = offset + 2;
+            for _ in 0..function.upvalue_count {
+                let is_local = chunk.code[offset];
+                let index = chunk.code[offset + 1];
+                let kind = if is_local == 1 { "local" } else { "upvalue" };
+                println!("{:04}    |                     {} {}", offset, kind, index);
+                offset += 2
+            }
+            offset
         },
         OPCODE::GetUpvalue =>   byte_instruction("OP_GET_UPVALUE", chunk, offset),
         OPCODE::SetUpvalue =>   byte_instruction("OP_SET_UPVALUE", chunk, offset),
+        OPCODE::CloseUpvalue => simple_instruction("OP_CLOSE_UPVALUE", offset),
     }
 }
 
